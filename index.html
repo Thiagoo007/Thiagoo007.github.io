@@ -52,7 +52,7 @@ a { color: inherit; }
 
 /* trilho */
 .scroller { position: relative; }
-.viewport { position: relative; height: calc(var(--vh1) * 100); overflow: hidden; touch-action: pan-y; }
+.viewport { position: relative; height: calc(var(--vh1) * 100); overflow: hidden; overflow: clip; touch-action: pan-y; }
 .track { position: absolute; top: 0; left: 0; height: 100%; display: flex; will-change: transform; }
 .panel { position: relative; flex: none; height: 100%; padding: calc(var(--top) + clamp(18px, calc(var(--vh1) * 4), 44px)) var(--pad) clamp(22px, calc(var(--vh1) * 5), 52px); display: flex; gap: clamp(28px, 4vw, 64px); align-items: stretch; }
 .panel + .panel { border-left: 1px solid rgba(36,48,74,.5); }
@@ -243,6 +243,7 @@ h1 .last { display: block; color: transparent; -webkit-text-stroke: 2px var(--pa
 .mob .p-sobre .c2 p { font-size: 15.5px; }
 .mob .grid2 { gap: 10px; }
 .mob .f4 .v { font-size: 16px; } .mob .r4 b { font-size: 16px; }
+.mob .tl::before { display: none; } /* no celular cada .tl-col desenha o próprio trecho da linha; a linha geral cortava o título e os cards de formação */
 .mob .tl-col { position: relative; }
 .mob .tl-col::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 2px; background: linear-gradient(90deg, var(--flare), rgba(111,143,232,.6)); }
 .mob .tl-col .job { left: 20px; right: 20px; }
@@ -626,7 +627,12 @@ h1 .last { display: block; color: transparent; -webkit-text-stroke: 2px var(--pa
   addEventListener('scroll', () => { if (!horiz) prog.style.width = (scrollY / Math.max(1, root.scrollHeight - innerHeight) * 100) + '%'; }, { passive: true });
   addEventListener('resize', layout);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout);
-  addEventListener('load', layout); layout();
+  // links com #secao: o navegador não pode rolar a viewport por conta própria (somaria com o translate do track)
+  vp.addEventListener('scroll', () => { if (vp.scrollLeft || vp.scrollTop) { vp.scrollLeft = 0; vp.scrollTop = 0; } });
+  function fromHash() { const id = decodeURIComponent(location.hash.slice(1)); const i = panels.findIndex(p => p.id === id);
+    vp.scrollLeft = 0; vp.scrollTop = 0; if (i > 0) go(i); }
+  addEventListener('hashchange', fromHash);
+  addEventListener('load', () => { layout(); fromHash(); }); layout();
 })();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
