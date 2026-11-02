@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guardião LGPD</title>
+<meta name="description" content="Detecta e anonimiza dados pessoais em CSV ou texto, 100% no navegador. Projeto de Thiago Moreira.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Layout: ferramenta de uma tela longa — entrada, risco, colunas, mapa de calor, antes/depois, exportação */
+  --ink: #0b0f1a;
+  --ink-2: #131a2b;
+  --ink-3: #1a2338;
+  --line: #24304a;
+  --paper: #eef1f7;
+  --soft: #c9d0de;
+  --muted: #8b96ad;
+  --flare: #ff6b35;
+  --ok: #4fd1a1;
+  --bad: #ff4d6d;
+  --warn: #facc15;
+  --display: "Bricolage Grotesque", "Arial Black", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--ink); color: var(--paper); font-family: var(--body); font-size: 15.5px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+a { color: inherit; }
+button, select, input, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--flare); outline-offset: 2px; border-radius: 4px; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 0 clamp(16px, 3vw, 32px); }
+
+/* topo */
+.top { border-bottom: 1px solid var(--line); }
+.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 18px; padding-bottom: 18px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 14px; }
+.shield { width: 38px; height: 38px; flex: none; }
+.brand h1 { font-family: var(--display); font-weight: 800; font-size: 24px; letter-spacing: -.03em; margin: 0; line-height: 1; }
+.brand .by { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-top: 4px; }
+.brand .by a { color: var(--soft); text-decoration: none; border-bottom: 1px solid var(--line); }
+.brand .by a:hover { color: var(--flare); border-color: var(--flare); }
+.local { font-family: var(--mono); font-size: 12px; color: var(--ok); border: 1px solid rgba(79,209,161,.4); background: rgba(79,209,161,.08); padding: 6px 12px; border-radius: 999px; display: inline-flex; gap: 8px; align-items: center; }
+.local::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+
+.tabs { display: flex; gap: 4px; margin-top: 22px; border-bottom: 1px solid var(--line); }
+.tab { background: none; border: 0; padding: 10px 16px; font-family: var(--mono); font-size: 13px; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tab[aria-selected="true"] { color: var(--paper); border-bottom-color: var(--flare); }
+.tab:hover { color: var(--paper); }
+.tab .pill { margin-left: 6px; font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--line); color: var(--paper); }
+.tab .pill.ok { background: rgba(79,209,161,.18); color: var(--ok); }
+.tab .pill.bad { background: rgba(255,77,109,.18); color: var(--bad); }
+
+main { padding: 26px 0 60px; }
+.panel[hidden] { display: none; }
+.grid { display: grid; gap: 18px; }
+.grid > *, .ba > *, .risk > *, .export > *, .input-grid > *, .about > * { min-width: 0; }
+.card { background: var(--ink-2); border: 1px solid var(--line); border-radius: 12px; padding: 20px; min-width: 0; }
+.card h2 { font-family: var(--display); font-size: 21px; font-weight: 700; letter-spacing: -.02em; margin: 0; line-height: 1.2; }
+.card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.step { font-family: var(--mono); font-size: 12px; color: var(--flare); margin-right: 8px; }
+.hint { color: var(--muted); font-size: 13.5px; margin: 0; }
+.mono { font-family: var(--mono); }
+
+/* entrada */
+.input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.drop { border: 1.5px dashed var(--line); border-radius: 10px; padding: 22px; display: grid; place-items: center; text-align: center; gap: 8px; min-height: 168px; transition: border-color .15s, background .15s; }
+.drop.over { border-color: var(--flare); background: rgba(255,107,53,.06); }
+.drop strong { font-family: var(--display); font-size: 18px; }
+textarea { width: 100%; min-height: 168px; resize: vertical; background: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 12px; font-family: var(--mono); font-size: 12.5px; line-height: 1.5; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.btn { border: 1px solid var(--line); background: var(--ink-3); padding: 9px 14px; border-radius: 7px; cursor: pointer; font-family: var(--mono); font-size: 13px; font-weight: 600; transition: border-color .15s, transform .15s; }
+.btn:hover { border-color: var(--flare); }
+.btn:active { transform: translateY(1px); }
+.btn.primary { background: var(--flare); border-color: var(--flare); color: var(--ink); }
+.btn.ghost { background: transparent; }
+.file-label { cursor: pointer; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.meta { font-family: var(--mono); font-size: 12.5px; color: var(--muted); margin-top: 12px; }
+.meta b { color: var(--paper); font-weight: 600; }
+
+/* risco */
+.risk { display: grid; grid-template-columns: 300px 1fr; gap: 18px; }
+.score { display: grid; gap: 10px; align-content: start; }
+.score .label { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.score .big { font-family: var(--display); font-weight: 800; font-size: 76px; line-height: .9; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.score .lvl { font-family: var(--mono); font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 999px; display: inline-block; }
+.meter { height: 10px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.meter i { display: block; height: 100%; border-radius: 999px; transition: width .4s ease; }
+.residual { font-family: var(--mono); font-size: 12.5px; color: var(--soft); border-top: 1px solid var(--line); padding-top: 12px; margin-top: 4px; }
+.residual b { font-size: 20px; font-family: var(--display); }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.stat { background: var(--ink); padding: 14px 16px; }
+.stat .k { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+.stat .v { font-family: var(--display); font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; margin-top: 4px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.chip { font-family: var(--mono); font-size: 12px; padding: 4px 9px; border-radius: 5px; background: var(--ink); border: 1px solid var(--line); display: inline-flex; gap: 7px; align-items: center; }
+.chip .dot { width: 9px; height: 9px; border-radius: 2px; }
+.chip b { font-weight: 600; }
+.alert { margin-top: 14px; border-left: 3px solid var(--warn); background: rgba(250,204,21,.07); padding: 10px 14px; border-radius: 0 8px 8px 0; font-size: 14px; color: var(--soft); }
+.alert strong { color: var(--warn); font-weight: 600; }
+
+/* tabelas */
+.scroll { position: relative; overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+.scroll.tall { max-height: 460px; overflow: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; vertical-align: middle; }
+thead th { position: sticky; top: 0; background: var(--ink-3); font-family: var(--mono); font-weight: 600; font-size: 12px; color: var(--soft); z-index: 1; }
+tbody tr:last-child td { border-bottom: 0; }
+td.data { font-family: var(--mono); font-size: 12.5px; }
+td.wrap { white-space: normal; min-width: 240px; }
+.rn { color: var(--muted); font-family: var(--mono); font-size: 11.5px; text-align: right; }
+.type-tag { font-family: var(--mono); font-size: 12px; display: inline-flex; gap: 7px; align-items: center; }
+.type-tag .dot { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+.type-none { color: var(--muted); }
+.conf { display: flex; align-items: center; gap: 8px; min-width: 120px; }
+.conf .bar { flex: 1; height: 6px; background: var(--line); border-radius: 999px; overflow: hidden; min-width: 60px; }
+.conf .bar i { display: block; height: 100%; }
+.conf span { font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; width: 42px; text-align: right; }
+select { background: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-family: var(--mono); font-size: 12.5px; cursor: pointer; }
+select:disabled { opacity: .45; cursor: not-allowed; }
+.ex { font-family: var(--mono); font-size: 12px; color: var(--soft); }
+.ex .arrow { color: var(--flare); margin: 0 6px; }
+.why { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+
+.heat td.data { position: relative; }
+mark { color: var(--paper); border-radius: 3px; padding: 0 2px; }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; font-family: var(--mono); font-size: 12px; color: var(--soft); }
+.legend span { display: inline-flex; gap: 6px; align-items: center; }
+.legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+.salt { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-family: var(--mono); font-size: 12.5px; color: var(--muted); }
+.salt input { background: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 6px 9px; font-family: var(--mono); font-size: 12.5px; width: 240px; max-width: 100%; }
+
+.ba { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.ba h3 { font-family: var(--mono); font-size: 12px; font-weight: 600; margin: 0 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.ba h3.after { color: var(--ok); }
+td.changed { color: var(--ok); }
+.toggle { font-family: var(--mono); font-size: 12.5px; color: var(--soft); display: inline-flex; gap: 8px; align-items: center; cursor: pointer; }
+.toggle input { accent-color: var(--flare); width: 16px; height: 16px; }
+
+pre.report { background: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 16px; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; white-space: pre-wrap; margin: 0; max-height: 380px; overflow: auto; color: var(--soft); }
+.export { display: grid; grid-template-columns: 300px 1fr; gap: 18px; }
+.export .actions { display: grid; gap: 10px; align-content: start; }
+.export .actions .btn { text-align: left; }
+
+/* testes */
+.tests-sum { display: flex; gap: 18px; align-items: baseline; flex-wrap: wrap; }
+.tests-sum .big { font-family: var(--display); font-size: 52px; font-weight: 800; letter-spacing: -.03em; line-height: 1; }
+.pass { color: var(--ok); } .fail { color: var(--bad); }
+td.res { font-family: var(--mono); font-weight: 600; }
+
+/* sobre */
+.about { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.about h3 { font-family: var(--display); font-size: 19px; margin: 0 0 8px; letter-spacing: -.01em; }
+.about p, .about li { color: var(--soft); margin: 0 0 10px; max-width: 65ch; }
+.about ul { padding-left: 18px; margin: 0; }
+.about code { font-family: var(--mono); font-size: 13px; color: var(--paper); background: var(--ink); padding: 1px 5px; border-radius: 4px; }
+
+.toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%) translateY(20px); background: var(--paper); color: var(--ink); font-family: var(--mono); font-size: 13px; font-weight: 600; padding: 10px 16px; border-radius: 8px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 10; max-width: calc(100% - 32px); }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+footer { border-top: 1px solid var(--line); padding: 20px 0 34px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+footer .wrap { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+@media (max-width: 960px) {
+  .input-grid, .risk, .ba, .export, .about { grid-template-columns: 1fr; }
+}
+@media (max-width: 480px) {
+  .stats { grid-template-columns: 1fr 1fr; }
+  .score .big { font-size: 60px; }
+  .tab { padding: 10px 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <svg class="shield" viewBox="0 0 40 40" aria-hidden="true">
+        <path d="M20 3 6 8.5v10.2C6 27.6 12 34.6 20 37c8-2.4 14-9.4 14-18.3V8.5L20 3Z" fill="none" stroke="#ff6b35" stroke-width="2.4" stroke-linejoin="round"/>
+        <path d="M13 19h14M13 24h9" stroke="#eef1f7" stroke-width="2.4" stroke-linecap="round"/>
+        <path d="M13 14h5" stroke="#4fd1a1" stroke-width="2.4" stroke-linecap="round"/>
+      </svg>
+      <div>
+        <h1>Guardião LGPD</h1>
+        <div class="by">por Thiago Moreira · <a href="https://github.com/Thiagoo007" target="_blank" rel="noopener">github.com/Thiagoo007</a></div>
+      </div>
+    </div>
+    <span class="local" title="Nenhuma requisição de rede é feita com os seus dados">100% local · nada sai do seu navegador</span>
+  </div>
+</header>
+
+<div class="wrap">
+  <nav class="tabs" role="tablist" aria-label="Seções">
+    <button class="tab" role="tab" id="tab-analisar" aria-controls="p-analisar" aria-selected="true">Analisar</button>
+    <button class="tab" role="tab" id="tab-testes" aria-controls="p-testes" aria-selected="false">Testes <span class="pill" id="tests-pill">…</span></button>
+    <button class="tab" role="tab" id="tab-sobre" aria-controls="p-sobre" aria-selected="false">Sobre o projeto</button>
+  </nav>
+</div>
+
+<main class="wrap">
+
+  <!-- ============ ANALISAR ============ -->
+  <section class="panel grid" id="p-analisar" role="tabpanel" aria-labelledby="tab-analisar">
+
+    <div class="card">
+      <div class="card-head">
+        <h2><span class="step">01</span>Entrada</h2>
+        <p class="hint">CSV (vírgula, ponto e vírgula ou tab) ou texto livre. Arquivos do Excel em Windows-1252 também funcionam.</p>
+      </div>
+      <div class="input-grid">
+        <div class="drop" id="drop">
+          <div>
+            <strong>Arraste um CSV aqui</strong>
+            <p class="hint">ou escolha um arquivo do computador</p>
+          </div>
+          <div class="row" style="justify-content:center">
+            <label class="btn file-label" for="file">Escolher arquivo</label>
+            <input type="file" id="file" class="sr" accept=".csv,.txt,text/csv,text/plain">
+            <button class="btn ghost" id="btn-sample" type="button">Recarregar exemplo</button>
+          </div>
+        </div>
+        <div>
+          <label class="sr" for="paste">Colar CSV ou texto</label>
+          <textarea id="paste" spellcheck="false" placeholder="Cole aqui um CSV ou um texto qualquer, por exemplo: Falar com a Ana pelo (61) 99812-4410 ou ana@exemplo.com.br"></textarea>
+          <div class="row" style="margin-top:10px">
+            <button class="btn primary" id="btn-analyze" type="button">Analisar o que colei</button>
+            <span class="hint" id="paste-hint"></span>
+          </div>
+        </div>
+      </div>
+      <div class="meta" id="meta"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2><span class="step">02</span>Risco de exposição</h2>
+        <p class="hint">Peso por tipo de dado × confiança da detecção, com bônus quando a combinação permite reidentificar alguém.</p>
+      </div>
+      <div class="risk">
+        <div class="score">
+          <div class="label">score antes do tratamento</div>
+          <div class="big" id="score-big">0</div>
+          <div><span class="lvl" id="score-lvl">–</span></div>
+          <div class="meter"><i id="score-bar"></i></div>
+          <div class="residual" id="residual"></div>
+        </div>
+        <div>
+          <div class="stats">
+            <div class="stat"><div class="k">colunas com dado pessoal</div><div class="v" id="st-cols">0</div></div>
+            <div class="stat"><div class="k">células com dado pessoal</div><div class="v" id="st-cells">0</div></div>
+            <div class="stat"><div class="k">dados escondidos em texto</div><div class="v" id="st-emb">0</div></div>
+          </div>
+          <div class="chips" id="type-chips"></div>
+          <div id="alerts"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2><span class="step">03</span>Colunas e tratamento</h2>
+        <div class="salt">
+          <label for="salt">salt da pseudonimização</label>
+          <input id="salt" spellcheck="false" autocomplete="off">
+          <button class="btn ghost" id="btn-salt" type="button">Gerar novo</button>
+        </div>
+      </div>
+      <p class="hint" style="margin-bottom:12px">Detecção por cabeçalho + amostragem dos valores. Mesmo salt gera o mesmo pseudônimo, então dá para cruzar duas planilhas tratadas.</p>
+      <div class="scroll">
+        <table id="cols-table">
+          <thead><tr><th>coluna</th><th>tipo detectado</th><th>confiança</th><th>tratamento</th><th>exemplo</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2><span class="step">04</span>Mapa de calor</h2>
+        <p class="hint" id="heat-hint">Cada célula colorida contém um dado pessoal validado.</p>
+      </div>
+      <div class="scroll tall"><table class="heat" id="heat"></table></div>
+      <div class="legend" id="legend"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2><span class="step">05</span>Antes e depois</h2>
+        <label class="toggle"><input type="checkbox" id="only-sens" checked> só colunas com dado pessoal</label>
+      </div>
+      <div class="ba">
+        <div><h3>antes</h3><div class="scroll"><table id="before"></table></div></div>
+        <div><h3 class="after">depois</h3><div class="scroll"><table id="after"></table></div></div>
+      </div>
+      <p class="hint" id="ba-hint" style="margin-top:10px"></p>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2><span class="step">06</span>Exportar</h2>
+        <p class="hint">O arquivo é gerado aqui mesmo, sem upload.</p>
+      </div>
+      <div class="export">
+        <div class="actions">
+          <button class="btn primary" id="btn-dl-csv" type="button">Baixar CSV anonimizado</button>
+          <button class="btn" id="btn-cp-csv" type="button">Copiar CSV anonimizado</button>
+          <button class="btn" id="btn-dl-rep" type="button">Baixar relatório</button>
+          <button class="btn" id="btn-cp-rep" type="button">Copiar relatório</button>
+        </div>
+        <pre class="report" id="report" aria-label="Relatório de tratamento"></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TESTES ============ -->
+  <section class="panel grid" id="p-testes" role="tabpanel" aria-labelledby="tab-testes" hidden>
+    <div class="card">
+      <div class="card-head">
+        <div class="tests-sum"><span class="big" id="tests-big">–</span><span class="hint" id="tests-desc"></span></div>
+        <button class="btn" id="btn-rerun" type="button">Rodar de novo</button>
+      </div>
+      <p class="hint" style="margin-bottom:12px">Os detectores e as máscaras são funções puras. Estes testes rodam no seu navegador sempre que a página abre.</p>
+      <div class="scroll"><table id="tests-table"><thead><tr><th>#</th><th>caso</th><th>esperado</th><th>obtido</th><th>resultado</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+
+  <!-- ============ SOBRE ============ -->
+  <section class="panel" id="p-sobre" role="tabpanel" aria-labelledby="tab-sobre" hidden>
+    <div class="about">
+      <div class="card">
+        <h3>O problema</h3>
+        <p>Planilhas com CPF, telefone e cartão circulam por e-mail, viram anexo de chamado e acabam em ambiente de teste. O Guardião LGPD mostra onde estão os dados pessoais de um arquivo e entrega uma versão tratada para compartilhar.</p>
+        <h3>Processamento 100% local</h3>
+        <p>O arquivo é lido com <code>FileReader</code> e processado em JavaScript na própria página. Não existe servidor, e a página não faz nenhuma requisição com os seus dados. Dá para abrir, desligar a internet e continuar usando.</p>
+        <h3>Detecção com validação real</h3>
+        <ul>
+          <li>CPF e CNPJ conferem os dígitos verificadores, e não só o formato.</li>
+          <li>Cartão passa pelo algoritmo de Luhn e pelo prefixo da bandeira.</li>
+          <li>Telefone só vale com DDD que existe no Brasil, e celular precisa começar com 9.</li>
+          <li>Datas são checadas no calendário (31/02 não passa), e placas aceitam o padrão antigo e o Mercosul.</li>
+          <li>Cada coluna é classificada pelo cabeçalho e por amostragem, com um percentual de confiança.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Máscara, hash com salt ou generalização?</h3>
+        <ul>
+          <li><b>Mascarar</b> segue o padrão do governo para CPF (<code>***.456.789-**</code>). Serve para exibir, mas some com o vínculo entre linhas.</li>
+          <li><b>Pseudonimizar</b> troca o valor por um SHA-256 com salt (Web Crypto). O mesmo CPF vira sempre o mesmo código, então ainda dá para fazer join e contagem. Sem o salt, ninguém reverte o código testando os 10⁹ CPFs possíveis.</li>
+          <li><b>Generalizar</b> reduz a precisão: data de nascimento vira faixa etária, CEP fica com 5 dígitos, e o CPF revela só a região fiscal pelo 9º dígito.</li>
+          <li><b>Remover</b> tira a coluna inteira do arquivo exportado.</li>
+        </ul>
+        <p>Dado pseudonimizado ainda pode ser ligado à pessoa por quem tem o salt. Por isso o risco residual conta a pseudonimização com peso maior que a máscara.</p>
+        <h3>Falsos positivos e limites</h3>
+        <p>Nomes só são detectados por coluna, porque "Rio de Janeiro" e "Ana Lima" têm o mesmo formato. Uma sequência de 11 dígitos pode ser CPF ou telefone, e a ordem dos validadores decide. Valores inválidos em coluna sensível, como um CPF com erro de digitação, continuam sendo dado pessoal e recebem máscara genérica.</p>
+        <h3>Stack</h3>
+        <p>HTML, CSS e JavaScript puros, em um único arquivo e sem dependências. Inclui parser de CSV próprio, SHA-256 via Web Crypto com fallback em JavaScript e autotestes.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Guardião LGPD · projeto de portfólio de Thiago Moreira</span>
+    <span>Dados de exemplo fictícios, gerados na hora</span>
+  </div>
+</footer>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+/* =====================================================================
+   1. TIPOS
+   ===================================================================== */
+const TYPES = {
+  cpf:      { label: "CPF",            color: "#ff6b35", weight: 10 },
+  cartao:   { label: "Cartão",         color: "#ff4d6d", weight: 10 },
+  rg:       { label: "RG",             color: "#f7a072", weight: 8 },
+  nome:     { label: "Nome",           color: "#a78bfa", weight: 6 },
+  email:    { label: "E-mail",         color: "#4fd1a1", weight: 5 },
+  telefone: { label: "Telefone",       color: "#38bdf8", weight: 5 },
+  data:     { label: "Data",           color: "#f472b6", weight: 4 },
+  placa:    { label: "Placa",          color: "#94a3b8", weight: 4 },
+  cnpj:     { label: "CNPJ",           color: "#c9a227", weight: 3 },
+  cep:      { label: "CEP",            color: "#facc15", weight: 3 },
+  texto:    { label: "Texto com dados", color: "#e879f9", weight: 4 }
+};
+const STRATEGIES = {
+  manter: "manter",
+  mascarar: "mascarar",
+  pseudonimizar: "pseudonimizar (hash)",
+  generalizar: "generalizar",
+  remover: "remover coluna"
+};
+const DEFAULT_STRATEGY = {
+  cpf: "mascarar", cartao: "mascarar", rg: "mascarar", nome: "pseudonimizar",
+  email: "pseudonimizar", telefone: "mascarar", data: "generalizar", placa: "mascarar",
+  cnpj: "manter", cep: "generalizar", texto: "mascarar"
+};
+const DDD = new Set([11,12,13,14,15,16,17,18,19,21,22,24,27,28,31,32,33,34,35,37,38,41,42,43,44,45,46,47,48,49,51,53,54,55,61,62,63,64,65,66,67,68,69,71,73,74,75,77,79,81,82,83,84,85,86,87,88,89,91,92,93,94,95,96,97,98,99]);
+const REGIAO_FISCAL = ["RS","DF, GO, MS, MT, TO","AC, AM, AP, PA, RO, RR","CE, MA, PI","AL, PB, PE, RN","BA, SE","MG","ES, RJ","SP","PR, SC"];
+
+/* =====================================================================
+   2. VALIDADORES (funções puras)
+   ===================================================================== */
+const onlyDigits = s => String(s).replace(/\D/g, "");
+
+function isCPF(v) {
+  const s = String(v).trim();
+  if (!/^\d{3}\.?\d{3}\.?\d{3}-?\d{2}$/.test(s)) return false;
+  const d = onlyDigits(s);
+  if (/^(\d)\1{10}$/.test(d)) return false;
+  const calc = len => {
+    let sum = 0;
+    for (let i = 0; i < len; i++) sum += Number(d[i]) * (len + 1 - i);
+    const r = (sum * 10) % 11;
+    return r === 10 ? 0 : r;
+  };
+  return calc(9) === Number(d[9]) && calc(10) === Number(d[10]);
+}
+
+function isCNPJ(v) {
+  const s = String(v).trim();
+  if (!/^\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}$/.test(s)) return false;
+  const d = onlyDigits(s);
+  if (/^(\d)\1{13}$/.test(d)) return false;
+  const calc = len => {
+    const w = len === 12 ? [5,4,3,2,9,8,7,6,5,4,3,2] : [6,5,4,3,2,9,8,7,6,5,4,3,2];
+    let sum = 0;
+    for (let i = 0; i < len; i++) sum += Number(d[i]) * w[i];
+    const r = sum % 11;
+    return r < 2 ? 0 : 11 - r;
+  };
+  return calc(12) === Number(d[12]) && calc(13) === Number(d[13]);
+}
+
+function isEmail(v) {
+  return /^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$/.test(String(v).trim());
+}
+
+function phoneDigits(v) {
+  let d = onlyDigits(v);
+  if ((d.length === 12 || d.length === 13) && d.startsWith("55")) d = d.slice(2);
+  return d;
+}
+function isTelefone(v) {
+  const s = String(v).trim();
+  if (!/^(\+?55\s?)?\(?\d{2}\)?[\s-]?9?\d{4}[\s-]?\d{4}$/.test(s)) return false;
+  const d = phoneDigits(s);
+  if (!DDD.has(Number(d.slice(0, 2)))) return false;
+  if (d.length === 11) return d[2] === "9";
+  if (d.length === 10) return "2345".includes(d[2]);
+  return false;
+}
+
+function isCEP(v) {
+  const s = String(v).trim();
+  return /^\d{5}-?\d{3}$/.test(s) && onlyDigits(s) !== "00000000";
+}
+
+function parseDate(v) {
+  const s = String(v).trim();
+  let m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/), d, mo, y;
+  if (m) { d = +m[1]; mo = +m[2]; y = +m[3]; }
+  else if ((m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/))) { y = +m[1]; mo = +m[2]; d = +m[3]; }
+  else return null;
+  const dt = new Date(y, mo - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
+  if (y < 1900 || dt > new Date()) return null;
+  return dt;
+}
+const isData = v => parseDate(v) !== null;
+
+function isPlaca(v) {
+  const s = String(v).trim().toUpperCase();
+  return /^[A-Z]{3}-?\d{4}$/.test(s) || /^[A-Z]{3}\d[A-Z]\d{2}$/.test(s);
+}
+
+function luhn(d) {
+  let sum = 0, alt = false;
+  for (let i = d.length - 1; i >= 0; i--) {
+    let n = Number(d[i]);
+    if (alt) { n *= 2; if (n > 9) n -= 9; }
+    sum += n; alt = !alt;
+  }
+  return sum % 10 === 0;
+}
+function bandeira(d) {
+  if (/^4/.test(d)) return "Visa";
+  if (/^(5[1-5]|2[2-7])/.test(d)) return "Mastercard";
+  if (/^3[47]/.test(d)) return "Amex";
+  if (/^(6011|65|64[4-9])/.test(d)) return "Discover";
+  if (/^(4011|4312|4389|4514|5041|5066|5067|509|6277|6362|6363|650|6516|6550)/.test(d)) return "Elo";
+  if (/^(606282|3841)/.test(d)) return "Hipercard";
+  return null;
+}
+function isCartao(v) {
+  const s = String(v).trim();
+  if (!/^\d(?:[ -]?\d){12,18}$/.test(s)) return false;
+  const d = onlyDigits(s);
+  return d.length >= 13 && d.length <= 19 && /^[2-6]/.test(d) && luhn(d) && bandeira(d) !== null;
+}
+
+function isRG(v, loose) {
+  const s = String(v).trim().toUpperCase();
+  if (/^\d{1,2}\.\d{3}\.\d{3}-?[\dX]$/.test(s)) return true;
+  return !!loose && /^\d{5,9}-?[\dX]?$/.test(s);
+}
+
+const NOME_RE = /^[A-ZÀ-Ý][a-zà-ÿ']+(?:\s+(?:d[aeo]s?|e|[A-ZÀ-Ý][a-zà-ÿ']+))+$/;
+const isNome = v => NOME_RE.test(String(v).trim());
+
+/* ordem importa: o primeiro validador que aceita define o tipo */
+function detectValue(v, hint, guessName) {
+  const s = String(v ?? "").trim();
+  if (!s) return null;
+  if (isEmail(s)) return "email";
+  if (isCPF(s)) return "cpf";
+  if (isCNPJ(s)) return "cnpj";
+  if (isCartao(s)) return "cartao";
+  if (isTelefone(s)) return "telefone";
+  if (isCEP(s)) return "cep";
+  if (isData(s)) return "data";
+  if (isPlaca(s)) return "placa";
+  if (isRG(s, hint === "rg")) return "rg";
+  if ((hint === "nome" || guessName) && isNome(s)) return "nome";
+  return null;
+}
+
+/* ---- busca de dados pessoais dentro de texto livre ---- */
+const SCANNERS = [
+  ["email",    /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g, isEmail],
+  ["cnpj",     /\b\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}\b|\b\d{14}\b/g, isCNPJ],
+  ["cpf",      /\b\d{3}\.\d{3}\.\d{3}-\d{2}\b|\b\d{11}\b/g, isCPF],
+  ["cartao",   /\b\d(?:[ -]?\d){12,18}\b/g, isCartao],
+  ["telefone", /(?:\+?55\s?)?(?:\(\d{2}\)|\b\d{2})\s?9?\d{4}[-\s]?\d{4}\b/g, isTelefone],
+  ["cep",      /\b\d{5}-\d{3}\b/g, isCEP],
+  ["data",     /\b\d{2}\/\d{2}\/\d{4}\b/g, isData],
+  ["placa",    /\b[A-Z]{3}-?\d[A-Z0-9]\d{2}\b/g, isPlaca]
+];
+function scanText(text) {
+  const s = String(text ?? "");
+  const found = [];
+  for (const [type, re, ok] of SCANNERS) {
+    re.lastIndex = 0;
+    let m;
+    while ((m = re.exec(s))) {
+      const start = m.index, end = start + m[0].length;
+      if (!ok(m[0])) continue;
+      if (found.some(f => start < f.end && end > f.start)) continue;
+      found.push({ type, start, end, value: m[0] });
+    }
+  }
+  return found.sort((a, b) => a.start - b.start);
+}
+
+/* =====================================================================
+   3. MÁSCARAS E GENERALIZAÇÃO (funções puras)
+   ===================================================================== */
+function maskValue(v, type) {
+  const s = String(v).trim();
+  const d = onlyDigits(s);
+  switch (type) {
+    case "cpf": return `***.${d.slice(3, 6)}.${d.slice(6, 9)}-**`;
+    case "cnpj": return `${d.slice(0, 2)}.***.***/****-${d.slice(12)}`;
+    case "cartao": return `**** **** **** ${d.slice(-4)}`;
+    case "email": {
+      const [u, dom] = s.split("@");
+      const parts = dom.split(".");
+      return `${u[0]}***@${parts[0][0]}***.${parts.slice(1).join(".")}`;
+    }
+    case "telefone": {
+      const p = phoneDigits(s);
+      return `(${p.slice(0, 2)}) ${p.length === 11 ? "9****" : "****"}-${p.slice(-4)}`;
+    }
+    case "cep": return `${d.slice(0, 2)}***-***`;
+    case "data": { const dt = parseDate(s); return `**/**/${dt.getFullYear()}`; }
+    case "placa": { const u = s.toUpperCase().replace("-", ""); return `*****${u.slice(-2)}`; }
+    case "rg": { const u = s.toUpperCase().replace(/\D/g, ""); return `**.***.${u.slice(-4, -1) || "***"}-*`; }
+    case "nome": {
+      const w = s.split(/\s+/);
+      return [w[0], ...w.slice(1).filter(x => !/^(d[aeo]s?|e)$/i.test(x)).map(x => x[0] + ".")].join(" ");
+    }
+    default: return "•••";
+  }
+}
+
+function ageBand(dt, ref = new Date()) {
+  let age = ref.getFullYear() - dt.getFullYear();
+  if (ref.getMonth() < dt.getMonth() || (ref.getMonth() === dt.getMonth() && ref.getDate() < dt.getDate())) age--;
+  if (age < 18) return "menor de 18";
+  if (age >= 70) return "70 anos ou mais";
+  const lo = Math.floor(age / 10) * 10;
+  return `${lo}–${lo + 9} anos`;
+}
+
+function generalizeValue(v, type, header) {
+  const s = String(v).trim();
+  const d = onlyDigits(s);
+  switch (type) {
+    case "data": {
+      const dt = parseDate(s);
+      return /nasc|birth|idade/i.test(header || "") ? ageBand(dt) : String(dt.getFullYear());
+    }
+    case "cep": return d.slice(0, 5);
+    case "cpf": return `região fiscal ${REGIAO_FISCAL[Number(d[8])]}`;
+    case "cartao": return bandeira(d);
+    case "telefone": return `DDD ${phoneDigits(s).slice(0, 2)}`;
+    case "email": return "@" + s.split("@")[1].toLowerCase();
+    case "nome": return s.split(/\s+/).filter(x => !/^(d[aeo]s?|e)$/i.test(x)).map(x => x[0] + ".").join("");
+    case "placa": return /^[A-Z]{3}\d[A-Z]\d{2}$/.test(s.toUpperCase()) ? "placa Mercosul" : "placa padrão antigo";
+    case "cnpj": return `CNPJ raiz ${d.slice(0, 8)}`;
+    case "rg": return "RG informado";
+    default: return `[${(TYPES[type] || {}).label || "dado"}]`;
+  }
+}
+
+function normalizeFor(type, v) {
+  const s = String(v).trim();
+  if (["cpf", "cnpj", "cartao", "cep", "rg"].includes(type)) return onlyDigits(s) || s.toUpperCase();
+  if (type === "telefone") return phoneDigits(s);
+  if (type === "email") return s.toLowerCase();
+  if (type === "placa") return s.toUpperCase().replace("-", "");
+  if (type === "data") { const dt = parseDate(s); return dt ? dt.toISOString().slice(0, 10) : s; }
+  return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ");
+}
+
+/* =====================================================================
+   4. SHA-256 (Web Crypto, com fallback em JS puro)
+   ===================================================================== */
+const SHA = (() => {
+  const primes = [];
+  for (let n = 2; primes.length < 64; n++) if (primes.every(p => n % p)) primes.push(n);
+  const frac = x => Math.floor((x - Math.floor(x)) * 2 ** 32) >>> 0;
+  return { K: primes.map(p => frac(Math.cbrt(p))), H0: primes.slice(0, 8).map(p => frac(Math.sqrt(p))) };
+})();
+const rotr = (x, n) => (x >>> n) | (x << (32 - n));
+function sha256js(str) {
+  const msg = new TextEncoder().encode(str);
+  const l = msg.length, total = ((l + 9 + 63) >> 6) << 6;
+  const buf = new Uint8Array(total); buf.set(msg); buf[l] = 0x80;
+  const dv = new DataView(buf.buffer);
+  dv.setUint32(total - 4, (l * 8) >>> 0);
+  dv.setUint32(total - 8, Math.floor((l * 8) / 2 ** 32));
+  let H = SHA.H0.slice();
+  const W = new Uint32Array(64);
+  for (let i = 0; i < total; i += 64) {
+    for (let t = 0; t < 16; t++) W[t] = dv.getUint32(i + t * 4);
+    for (let t = 16; t < 64; t++) {
+      const s0 = rotr(W[t - 15], 7) ^ rotr(W[t - 15], 18) ^ (W[t - 15] >>> 3);
+      const s1 = rotr(W[t - 2], 17) ^ rotr(W[t - 2], 19) ^ (W[t - 2] >>> 10);
+      W[t] = (W[t - 16] + s0 + W[t - 7] + s1) >>> 0;
+    }
+    let [a, b, c, d, e, f, g, h] = H;
+    for (let t = 0; t < 64; t++) {
+      const t1 = (h + (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) + ((e & f) ^ (~e & g)) + SHA.K[t] + W[t]) >>> 0;
+      const t2 = ((rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) >>> 0;
+      h = g; g = f; f = e; e = (d + t1) >>> 0; d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+    }
+    H = [a, b, c, d, e, f, g, h].map((v, j) => (v + H[j]) >>> 0);
+  }
+  return H.map(v => v.toString(16).padStart(8, "0")).join("");
+}
+const hasWebCrypto = !!(window.crypto && crypto.subtle && window.isSecureContext !== false);
+async function sha256(str) {
+  if (hasWebCrypto) {
+    try {
+      const out = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+      return [...new Uint8Array(out)].map(b => b.toString(16).padStart(2, "0")).join("");
+    } catch (e) { /* cai no fallback */ }
+  }
+  return sha256js(str);
+}
+const PSEUDO_PREFIX = { cpf: "cpf", cnpj: "cnpj", cartao: "card", rg: "rg", nome: "pessoa", email: "email", telefone: "tel", data: "data", placa: "placa", cep: "cep" };
+const hashKey = (salt, type, v) => `${salt}|${type}|${normalizeFor(type, v)}`;
+
+/* =====================================================================
+   5. CSV
+   ===================================================================== */
+function detectDelimiter(text) {
+  const first = text.split(/\r?\n/).find(l => l.trim()) || "";
+  let best = null, bestN = 0;
+  for (const d of [";", ",", "\t", "|"]) {
+    let n = 0, q = false;
+    for (const ch of first) { if (ch === '"') q = !q; else if (ch === d && !q) n++; }
+    if (n > bestN) { best = d; bestN = n; }
+  }
+  return best;
+}
+function parseCSV(text, delim) {
+  const rows = []; let row = [], field = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) {
+      if (ch === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else q = false; }
+      else field += ch;
+    } else if (ch === '"' && field === "") q = true;
+    else if (ch === delim) { row.push(field); field = ""; }
+    else if (ch === "\n" || ch === "\r") {
+      if (ch === "\r" && text[i + 1] === "\n") i++;
+      row.push(field); rows.push(row); row = []; field = "";
+    } else field += ch;
+  }
+  if (field !== "" || row.length) { row.push(field); rows.push(row); }
+  return rows.filter(r => r.some(c => c.trim() !== ""));
+}
+function toCSV(headers, rows, delim) {
+  const cell = v => {
+    const s = String(v ?? "");
+    return /["\r\n]/.test(s) || s.includes(delim) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  return [headers, ...rows].map(r => r.map(cell).join(delim)).join("\r\n");
+}
+
+/* =====================================================================
+   6. ANÁLISE
+   ===================================================================== */
+const HEADER_HINTS = [
+  ["cpf", /cpf/i], ["cnpj", /cnpj/i], ["email", /e-?mail/i], ["telefone", /tel|fone|celular|whats/i],
+  ["cep", /\bcep\b|^cep/i], ["data", /nasc|birth|data|dt_/i], ["placa", /placa/i],
+  ["cartao", /cart[aã]o|card|cc_num/i], ["rg", /^rg$|^rg_|_rg$|identidade/i], ["nome", /nome|name|cliente|titular|respons/i]
+];
+const NOT_NAME_HEADER = /cidade|munic|bairro|estado|^uf$|plano|produto|empresa|rua|logradouro/i;
+function headerHint(h) {
+  for (const [t, re] of HEADER_HINTS) if (re.test(h)) return t;
+  return null;
+}
+
+function analyze(dataset) {
+  const { headers, rows } = dataset;
+  const cols = headers.map((h, ci) => {
+    const hint = headerHint(h);
+    const vals = rows.map(r => r[ci] ?? "");
+    const nonEmpty = vals.filter(v => String(v).trim() !== "").length || 0;
+    const tally = {};
+    vals.forEach(v => { const t = detectValue(v, hint, true); if (t) tally[t] = (tally[t] || 0) + 1; });
+    let type = null, conf = 0, why = "";
+    const dom = Object.entries(tally).sort((a, b) => b[1] - a[1])[0];
+    if (hint && nonEmpty && (tally[hint] || 0) / nonEmpty >= 0.3) {
+      type = hint; conf = tally[hint] / nonEmpty; why = "cabeçalho + valores";
+    } else if (dom && nonEmpty && dom[1] / nonEmpty >= 0.6 &&
+               (dom[0] !== "nome" || (dom[1] / nonEmpty >= 0.9 && !NOT_NAME_HEADER.test(h)))) {
+      type = dom[0]; conf = dom[1] / nonEmpty; why = "valores";
+    }
+    return { name: h, idx: ci, hint, type, conf, nonEmpty, why, embeddedCells: 0 };
+  });
+
+  const cells = rows.map(r => headers.map((_, ci) => {
+    const col = cols[ci], v = r[ci] ?? "";
+    if (!String(v).trim()) return null;
+    if (col.type) {
+      const t = detectValue(v, col.hint, col.type === "nome");
+      if (t === col.type) return { type: t };
+      return { type: col.type, invalid: true };
+    }
+    const t = detectValue(v, null, false);
+    if (t) return { type: t, stray: true };
+    const spans = scanText(v);
+    if (spans.length) { col.embeddedCells++; return { spans }; }
+    return null;
+  }));
+
+  cols.forEach(c => {
+    if (!c.type && c.embeddedCells > 0) {
+      c.type = "texto"; c.conf = c.embeddedCells / (c.nonEmpty || 1); c.why = "dados dentro do texto";
+    }
+    c.sensitive = !!c.type;
+    c.strategy = c.strategy || (c.type ? DEFAULT_STRATEGY[c.type] : "manter");
+  });
+  return { cols, cells };
+}
+
+function exposureScore(cols, strategyFactor) {
+  const f = strategyFactor || (() => 1);
+  let sum = 0;
+  const present = new Set();
+  cols.forEach(c => {
+    if (!c.sensitive) return;
+    const k = f(c);
+    sum += TYPES[c.type].weight * Math.min(1, c.conf) * k;
+    if (k > 0.5) present.add(c.type);
+  });
+  const reid = present.has("nome") && (present.has("cpf") || present.has("data") || present.has("telefone"));
+  const quasi = present.has("data") && present.has("cep");
+  if (reid) sum += 10;
+  if (quasi) sum += 8;
+  return { score: Math.min(100, Math.round(sum * 1.2)), reid, quasi };
+}
+const RESIDUAL = { manter: 1, pseudonimizar: 0.3, generalizar: 0.25, mascarar: 0.15, remover: 0 };
+function riskLevel(s) {
+  if (s < 25) return ["baixo", "var(--ok)"];
+  if (s < 50) return ["moderado", "var(--warn)"];
+  if (s < 75) return ["alto", "var(--flare)"];
+  return ["crítico", "var(--bad)"];
+}
+
+/* =====================================================================
+   7. TRATAMENTO (assíncrono por causa do hash)
+   ===================================================================== */
+async function buildHashMap(dataset, an, salt) {
+  const keys = new Set();
+  an.cols.forEach(c => {
+    if (!c.sensitive || c.strategy !== "pseudonimizar") return;
+    dataset.rows.forEach((r, ri) => {
+      const v = r[c.idx] ?? "", cell = an.cells[ri][c.idx];
+      if (!cell) return;
+      if (cell.spans) cell.spans.forEach(sp => keys.add(hashKey(salt, sp.type, sp.value)));
+      else keys.add(hashKey(salt, cell.invalid ? "invalido" : c.type, v));
+    });
+  });
+  const map = new Map();
+  await Promise.all([...keys].map(async k => map.set(k, await sha256(k))));
+  return map;
+}
+function pseudo(map, salt, type, v) {
+  const h = map.get(hashKey(salt, type, v)) || sha256js(hashKey(salt, type, v));
+  return `${PSEUDO_PREFIX[type] || "id"}_${h.slice(0, 12)}`;
+}
+function treatCell(v, cell, col, map, salt) {
+  if (!cell || !col.sensitive || col.strategy === "manter") return v;
+  const st = col.strategy;
+  if (cell.spans) {
+    let out = "", last = 0;
+    cell.spans.forEach(sp => {
+      out += v.slice(last, sp.start);
+      out += st === "mascarar" ? maskValue(sp.value, sp.type)
+           : st === "pseudonimizar" ? pseudo(map, salt, sp.type, sp.value)
+           : `[${TYPES[sp.type].label}]`;
+      last = sp.end;
+    });
+    return out + v.slice(last);
+  }
+  if (cell.invalid) return st === "pseudonimizar" ? pseudo(map, salt, "invalido", v) : "•••";
+  if (st === "mascarar") return maskValue(v, col.type);
+  if (st === "pseudonimizar") return pseudo(map, salt, col.type, v);
+  if (st === "generalizar") return generalizeValue(v, col.type, col.name);
+  return v;
+}
+async function treat(dataset, an, salt) {
+  const map = await buildHashMap(dataset, an, salt);
+  const keep = an.cols.filter(c => !(c.sensitive && c.strategy === "remover"));
+  const headers = keep.map(c => c.name);
+  const rows = dataset.rows.map((r, ri) => keep.map(c => treatCell(r[c.idx] ?? "", an.cells[ri][c.idx], c, map, salt)));
+  return { headers, rows, keep, map };
+}
+
+/* =====================================================================
+   8. DADOS DE EXEMPLO (fictícios, gerados com semente fixa)
+   ===================================================================== */
+function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function makeCPF(rnd) {
+  const d = Array.from({ length: 9 }, () => Math.floor(rnd() * 10));
+  for (const len of [9, 10]) {
+    let s = 0; for (let i = 0; i < len; i++) s += d[i] * (len + 1 - i);
+    const r = (s * 10) % 11; d.push(r === 10 ? 0 : r);
+  }
+  const x = d.join("");
+  return `${x.slice(0, 3)}.${x.slice(3, 6)}.${x.slice(6, 9)}-${x.slice(9)}`;
+}
+function sampleCSV() {
+  const rnd = mulberry32(2026);
+  const pick = a => a[Math.floor(rnd() * a.length)];
+  const pad = (n, l) => String(n).padStart(l, "0");
+  const first = ["Ana","Bruno","Carla","Diego","Eduarda","Felipe","Gabriela","Heitor","Isabela","João","Karina","Lucas","Mariana","Nicolas","Olívia","Pedro","Rafaela","Samuel","Tatiane","Vinícius"];
+  const last = ["Almeida","Barbosa","Cardoso","Duarte","Esteves","Ferreira","Gomes","Lima","Martins","Nogueira","Oliveira","Pereira","Ribeiro","Santos","Teixeira"];
+  const cities = [["Brasília",61,"70"],["São Paulo",11,"01"],["Rio de Janeiro",21,"20"],["Belo Horizonte",31,"30"],["Curitiba",41,"80"],["Porto Alegre",51,"90"],["Salvador",71,"40"],["Recife",81,"50"],["Goiânia",62,"74"],["Fortaleza",85,"60"]];
+  const cards = ["4111 1111 1111 1111","5555 5555 5555 4444","4012 8888 8888 1881","5105 1051 0510 5100","4242 4242 4242 4242","3782 822463 10005","6011 1111 1111 1117"];
+  const L = "ABCDEFGHJKLMNPRSTUVWXYZ";
+  const plans = [["Básico","49,90"],["Plus","89,90"],["Premium","149,90"]];
+  const notes = ["", "", "", "Cliente desde 2019", "Prefere contato pelo (11) 98877-6655 depois das 18h", "Enviar fatura para financeiro@empresa-ficticia.com.br", "Indicado pelo cliente de CPF 529.982.247-25", "", "Reclamou do atraso na entrega", "Segundo titular: Paulo Henrique, tel (61) 3322-4455", ""];
+  const strip = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const rows = [["id","nome","cpf","email","telefone","cep","data_nascimento","placa","cartao","cidade","plano","valor_mensal","observacao"]];
+  for (let i = 1; i <= 40; i++) {
+    const f = pick(first), l1 = pick(last), l2 = pick(last);
+    const [city, ddd, cepPre] = pick(cities);
+    let cpf = makeCPF(rnd);
+    if (i === 7) cpf = cpf.slice(0, -1) + ((+cpf.slice(-1) + 1) % 10); // erro de digitação proposital
+    let email = `${strip(f)}.${strip(l2)}${i}@exemplo.com.br`;
+    if (i === 20) email = "não informado";
+    const tel = i === 12 ? "" : `(${ddd}) 9${pad(Math.floor(rnd() * 10000), 4)}-${pad(Math.floor(rnd() * 10000), 4)}`;
+    const cep = `${cepPre}${pad(Math.floor(rnd() * 1000), 3)}-${pad(Math.floor(rnd() * 1000), 3)}`;
+    const nasc = `${pad(1 + Math.floor(rnd() * 28), 2)}/${pad(1 + Math.floor(rnd() * 12), 2)}/${1950 + Math.floor(rnd() * 55)}`;
+    const placa = rnd() < 0.5
+      ? `${pick(L)}${pick(L)}${pick(L)}-${pad(Math.floor(rnd() * 10000), 4)}`
+      : `${pick(L)}${pick(L)}${pick(L)}${Math.floor(rnd() * 10)}${pick(L)}${pad(Math.floor(rnd() * 100), 2)}`;
+    const [plano, valor] = pick(plans);
+    rows.push([String(i), `${f} ${l1} ${l2}`, cpf, email, tel, cep, nasc, placa, pick(cards), city, plano, valor, pick(notes)]);
+  }
+  return toCSV(rows[0], rows.slice(1), ";");
+}
+
+/* =====================================================================
+   9. ESTADO E RENDERIZAÇÃO
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const MAX_VIEW = 200;
+const state = { dataset: null, an: null, out: null, salt: "", source: "", version: 0 };
+
+function randomSalt() {
+  const a = new Uint8Array(12);
+  try { crypto.getRandomValues(a); } catch (e) { a.forEach((_, i) => a[i] = Math.floor(Math.random() * 256)); }
+  return [...a].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+function loadText(text, source) {
+  const delim = detectDelimiter(text);
+  let headers, rows, mode = "csv";
+  if (delim) {
+    const parsed = parseCSV(text, delim);
+    const width = parsed[0] ? parsed[0].length : 0;
+    const consistent = parsed.length > 1 && parsed.slice(1).filter(r => r.length === width).length / (parsed.length - 1) >= 0.8;
+    if (width >= 2 && consistent) {
+      headers = parsed[0].map((h, i) => h.trim() || `coluna_${i + 1}`);
+      rows = parsed.slice(1).map(r => headers.map((_, i) => r[i] ?? ""));
+    }
+  }
+  if (!headers) {
+    mode = "texto";
+    headers = ["texto"];
+    rows = text.split(/\r?\n/).filter(l => l.trim()).map(l => [l]);
+  }
+  state.dataset = { headers, rows, delim: delim && mode === "csv" ? delim : ";", mode };
+  state.source = source;
+  state.an = analyze(state.dataset);
+  renderAll();
+}
+
+function typeTag(t) {
+  if (!t) return `<span class="type-tag type-none">nenhum</span>`;
+  return `<span class="type-tag"><span class="dot" style="background:${TYPES[t].color}"></span>${TYPES[t].label}</span>`;
+}
+function tint(t, a = 0.22) {
+  const hex = TYPES[t].color.slice(1);
+  const [r, g, b] = [0, 2, 4].map(i => parseInt(hex.slice(i, i + 2), 16));
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function renderMeta() {
+  const { headers, rows, delim, mode } = state.dataset;
+  const dname = { ";": "ponto e vírgula", ",": "vírgula", "\t": "tab", "|": "barra vertical" }[delim];
+  $("meta").innerHTML = mode === "csv"
+    ? `<b>${esc(state.source)}</b> · ${rows.length} linhas · ${headers.length} colunas · delimitador ${dname}`
+    : `<b>${esc(state.source)}</b> · texto livre · ${rows.length} linhas analisadas uma a uma`;
+}
+
+function renderRisk() {
+  const { cols, cells } = state.an;
+  const before = exposureScore(cols);
+  const after = exposureScore(cols, c => RESIDUAL[c.strategy] ?? 1);
+  const [lvl, color] = riskLevel(before.score);
+  const [lvl2, color2] = riskLevel(after.score);
+  $("score-big").textContent = before.score;
+  $("score-big").style.color = color;
+  $("score-lvl").textContent = `risco ${lvl}`;
+  $("score-lvl").style.cssText = `color:${color};border:1px solid ${color}`;
+  $("score-bar").style.cssText = `width:${before.score}%;background:${color}`;
+  $("residual").innerHTML = `depois do tratamento escolhido: <b style="color:${color2}">${after.score}</b> · risco ${lvl2}`;
+
+  const counts = {};
+  let cellsN = 0, emb = 0;
+  cells.forEach(r => r.forEach(c => {
+    if (!c) return;
+    if (c.spans) { emb += c.spans.length; c.spans.forEach(s => counts[s.type] = (counts[s.type] || 0) + 1); cellsN++; }
+    else if (!c.invalid) { counts[c.type] = (counts[c.type] || 0) + 1; cellsN++; }
+    else cellsN++;
+  }));
+  $("st-cols").textContent = cols.filter(c => c.sensitive).length;
+  $("st-cells").textContent = cellsN;
+  $("st-emb").textContent = emb;
+  $("type-chips").innerHTML = Object.entries(counts).sort((a, b) => b[1] - a[1])
+    .map(([t, n]) => `<span class="chip"><span class="dot" style="background:${TYPES[t].color}"></span>${TYPES[t].label} <b>${n}</b></span>`).join("")
+    || `<span class="hint">Nenhum dado pessoal encontrado.</span>`;
+
+  const alerts = [];
+  if (before.reid) alerts.push(`<strong>Reidentificação direta:</strong> o arquivo junta nome com CPF, data de nascimento ou telefone, o que identifica a pessoa sem nenhuma outra fonte.`);
+  if (before.quasi) alerts.push(`<strong>Quase-identificadores:</strong> data de nascimento + CEP já bastam para apontar uma pessoa em boa parte dos casos, mesmo sem o nome.`);
+  const invalid = cells.flat().filter(c => c && c.invalid).length;
+  if (invalid) alerts.push(`<strong>${invalid} valor${invalid > 1 ? "es" : ""} fora do padrão</strong> em colunas sensíveis (ex.: CPF com dígito errado). Continuam sendo dado pessoal e recebem máscara genérica.`);
+  $("alerts").innerHTML = alerts.map(a => `<div class="alert">${a}</div>`).join("");
+}
+
+function exampleFor(col) {
+  const { rows } = state.dataset;
+  for (let ri = 0; ri < rows.length; ri++) {
+    const cell = state.an.cells[ri][col.idx];
+    if (cell && !cell.invalid) {
+      const v = rows[ri][col.idx];
+      const after = col.strategy === "remover" ? "(coluna removida)" : treatCell(v, cell, col, state.out ? state.out.map : new Map(), state.salt);
+      const short = s => s.length > 46 ? s.slice(0, 44) + "…" : s;
+      return `<span class="ex">${esc(short(v))}<span class="arrow">→</span>${esc(short(after))}</span>`;
+    }
+  }
+  return `<span class="ex type-none">—</span>`;
+}
+
+function renderCols() {
+  const tb = $("cols-table").tBodies[0];
+  tb.innerHTML = state.an.cols.map(c => {
+    const pct = Math.round(c.conf * 100);
+    const opts = Object.entries(STRATEGIES).map(([k, l]) => `<option value="${k}"${k === c.strategy ? " selected" : ""}>${l}</option>`).join("");
+    return `<tr>
+      <td class="data">${esc(c.name)}</td>
+      <td>${typeTag(c.type)}${c.type ? `<div class="why">${c.why}</div>` : ""}</td>
+      <td>${c.type ? `<div class="conf"><div class="bar"><i style="width:${pct}%;background:${TYPES[c.type].color}"></i></div><span>${pct}%</span></div>` : `<span class="why">—</span>`}</td>
+      <td><label class="sr" for="st-${c.idx}">Tratamento da coluna ${esc(c.name)}</label>
+          <select id="st-${c.idx}" data-col="${c.idx}" ${c.sensitive ? "" : "disabled"}>${opts}</select></td>
+      <td id="ex-${c.idx}">${c.sensitive ? exampleFor(c) : `<span class="ex type-none">sem dado pessoal</span>`}</td>
+    </tr>`;
+  }).join("");
+}
+
+function cellHTML(v, cell) {
+  if (!cell) return { html: esc(v), style: "" };
+  if (cell.spans) {
+    let out = "", last = 0;
+    cell.spans.forEach(sp => {
+      out += esc(v.slice(last, sp.start)) + `<mark style="background:${tint(sp.type, 0.45)}" title="${TYPES[sp.type].label}">${esc(sp.value)}</mark>`;
+      last = sp.end;
+    });
+    return { html: out + esc(v.slice(last)), style: "" };
+  }
+  const title = cell.invalid ? `${TYPES[cell.type].label} fora do padrão` : TYPES[cell.type].label;
+  const style = cell.invalid
+    ? `background:repeating-linear-gradient(45deg,${tint(cell.type, 0.18)} 0 6px,transparent 6px 12px)`
+    : `background:${tint(cell.type)}`;
+  return { html: esc(v), style: `${style}" title="${title}` };
+}
+
+function renderHeat() {
+  const { headers, rows } = state.dataset;
+  const view = rows.slice(0, MAX_VIEW);
+  const head = `<thead><tr><th class="rn">#</th>${headers.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead>`;
+  const body = view.map((r, ri) => `<tr><td class="rn">${ri + 1}</td>${r.map((v, ci) => {
+    const { html, style } = cellHTML(v, state.an.cells[ri][ci]);
+    const wrapCls = state.dataset.mode === "texto" || state.an.cols[ci].type === "texto" ? " wrap" : "";
+    return `<td class="data${wrapCls}"${style ? ` style="${style}"` : ""}>${html}</td>`;
+  }).join("")}</tr>`).join("");
+  $("heat").innerHTML = head + `<tbody>${body}</tbody>`;
+  $("heat-hint").textContent = rows.length > MAX_VIEW
+    ? `Mostrando ${MAX_VIEW} de ${rows.length} linhas. A exportação inclui todas.`
+    : "Cada célula colorida contém um dado pessoal validado. Listras indicam valor fora do padrão.";
+  const used = new Set();
+  state.an.cells.forEach(r => r.forEach(c => { if (!c) return; if (c.spans) c.spans.forEach(s => used.add(s.type)); else used.add(c.type); }));
+  $("legend").innerHTML = [...used].filter(t => t !== "texto").map(t => `<span><i style="background:${TYPES[t].color}"></i>${TYPES[t].label}</span>`).join("");
+}
+
+function renderBA() {
+  const only = $("only-sens").checked;
+  const { headers, rows } = state.dataset;
+  const cols = state.an.cols.filter(c => !only || c.sensitive);
+  const n = Math.min(12, rows.length);
+  const bHead = `<thead><tr><th class="rn">#</th>${cols.map(c => `<th>${esc(c.name)}</th>`).join("")}</tr></thead>`;
+  const bBody = rows.slice(0, n).map((r, ri) => `<tr><td class="rn">${ri + 1}</td>${cols.map(c => `<td class="data${c.type === "texto" || state.dataset.mode === "texto" ? " wrap" : ""}">${esc(r[c.idx])}</td>`).join("")}</tr>`).join("");
+  $("before").innerHTML = bHead + `<tbody>${bBody}</tbody>`;
+
+  const out = state.out;
+  const aCols = cols.filter(c => out.keep.includes(c));
+  const pos = new Map(out.keep.map((c, i) => [c, i]));
+  const aHead = `<thead><tr><th class="rn">#</th>${aCols.map(c => `<th>${esc(c.name)}</th>`).join("")}</tr></thead>`;
+  const aBody = out.rows.slice(0, n).map((r, ri) => `<tr><td class="rn">${ri + 1}</td>${aCols.map(c => {
+    const v = r[pos.get(c)], changed = v !== rows[ri][c.idx];
+    return `<td class="data${changed ? " changed" : ""}${c.type === "texto" || state.dataset.mode === "texto" ? " wrap" : ""}">${esc(v)}</td>`;
+  }).join("")}</tr>`).join("");
+  $("after").innerHTML = aHead + `<tbody>${aBody}</tbody>`;
+  const removed = state.an.cols.filter(c => c.sensitive && c.strategy === "remover").map(c => c.name);
+  $("ba-hint").textContent = `Primeiras ${n} linhas.` + (removed.length ? ` Colunas removidas no arquivo final: ${removed.join(", ")}.` : "");
+}
+
+function reportText() {
+  const { dataset, an, out } = state;
+  const before = exposureScore(an.cols), after = exposureScore(an.cols, c => RESIDUAL[c.strategy] ?? 1);
+  const now = new Date();
+  const fmt = now.toLocaleDateString("pt-BR") + " " + now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  const sens = an.cols.filter(c => c.sensitive);
+  const lines = [
+    "RELATÓRIO DE TRATAMENTO · Guardião LGPD",
+    "─".repeat(44),
+    `Origem:         ${state.source}`,
+    `Gerado em:      ${fmt}`,
+    `Processamento:  local, no navegador (nenhum dado enviado)`,
+    `Volume:         ${dataset.rows.length} linhas · ${dataset.headers.length} colunas · ${sens.length} com dados pessoais`,
+    `Risco:          ${before.score} (${riskLevel(before.score)[0]}) antes → ${after.score} (${riskLevel(after.score)[0]}) depois`,
+    "",
+    "Tratamento por coluna"
+  ];
+  sens.forEach(c => {
+    const n = an.cells.filter(r => r[c.idx]).length;
+    lines.push(`  · ${c.name.padEnd(18)} ${TYPES[c.type].label.padEnd(16)} ${String(Math.round(c.conf * 100) + "%").padStart(4)}  ${STRATEGIES[c.strategy].padEnd(22)} ${n} valor${n === 1 ? "" : "es"}`);
+  });
+  const kept = an.cols.filter(c => !c.sensitive).map(c => c.name);
+  if (kept.length) lines.push("", `Mantidas sem alteração (sem dado pessoal): ${kept.join(", ")}`);
+  const invalid = an.cells.flat().filter(c => c && c.invalid).length;
+  if (invalid) lines.push(`Valores fora do padrão em colunas sensíveis: ${invalid} (tratados com máscara genérica)`);
+  if (sens.some(c => c.strategy === "pseudonimizar")) {
+    lines.push("", `Pseudonimização: SHA-256 com salt. Impressão do salt: ${sha256js(state.salt).slice(0, 8)}`,
+      "O salt não aparece neste relatório. Guarde-o separado do arquivo: quem o tiver consegue ligar o código à pessoa.");
+  }
+  if (before.reid && after.reid) lines.push("", "Atenção: a combinação mantida ainda permite reidentificação direta.");
+  return lines.join("\n");
+}
+
+async function recompute() {
+  const v = ++state.version;
+  const out = await treat(state.dataset, state.an, state.salt);
+  if (v !== state.version) return;
+  state.out = out;
+  renderRisk();
+  state.an.cols.forEach(c => { const el = $(`ex-${c.idx}`); if (el && c.sensitive) el.innerHTML = exampleFor(c); });
+  renderBA();
+  $("report").textContent = reportText();
+}
+
+function renderAll() {
+  renderMeta();
+  renderCols();
+  renderHeat();
+  state.out = { headers: [], rows: [], keep: [], map: new Map() };
+  recompute();
+}
+
+/* =====================================================================
+   10. EVENTOS
+   ===================================================================== */
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("show"), 2600);
+}
+async function copy(text, what) {
+  try { await navigator.clipboard.writeText(text); toast(`${what} copiado.`); }
+  catch (e) { toast("O navegador bloqueou a área de transferência. Use o botão de baixar."); }
+}
+function download(text, name, mime) {
+  try {
+    const blob = new Blob(["﻿" + text], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+    toast(`Arquivo ${name} gerado.`);
+  } catch (e) { toast("Este ambiente bloqueou o download. Use o botão de copiar."); }
+}
+const outName = suffix => (state.source.replace(/\.(csv|txt)$/i, "") || "dados").replace(/[^\w.-]+/g, "_") + suffix;
+
+function readFile(file) {
+  const r = new FileReader();
+  r.onload = () => {
+    const txt = String(r.result);
+    if (txt.includes("�")) {
+      const r2 = new FileReader();
+      r2.onload = () => loadText(String(r2.result), file.name + " (Windows-1252)");
+      r2.readAsText(file, "windows-1252");
+    } else loadText(txt, file.name);
+  };
+  r.onerror = () => toast("Não consegui ler o arquivo. Ele está corrompido ou é binário.");
+  r.readAsText(file, "utf-8");
+}
+
+document.querySelectorAll(".tab").forEach(tab => tab.addEventListener("click", () => {
+  document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", String(t === tab)));
+  document.querySelectorAll(".panel").forEach(p => p.hidden = p.id !== tab.getAttribute("aria-controls"));
+}));
+
+const drop = $("drop");
+["dragenter", "dragover"].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", ev => { const f = ev.dataTransfer.files[0]; if (f) readFile(f); });
+$("file").addEventListener("change", ev => { const f = ev.target.files[0]; if (f) readFile(f); ev.target.value = ""; });
+$("btn-sample").addEventListener("click", () => loadText(sampleCSV(), "clientes_exemplo.csv"));
+$("btn-analyze").addEventListener("click", () => {
+  const t = $("paste").value;
+  if (!t.trim()) { $("paste-hint").textContent = "Cole um CSV ou um texto primeiro."; return; }
+  $("paste-hint").textContent = "";
+  loadText(t, "texto colado");
+});
+$("cols-table").addEventListener("change", ev => {
+  const sel = ev.target.closest("select[data-col]");
+  if (!sel) return;
+  state.an.cols[Number(sel.dataset.col)].strategy = sel.value;
+  recompute();
+});
+$("salt").addEventListener("input", ev => { state.salt = ev.target.value; recompute(); });
+$("btn-salt").addEventListener("click", () => { state.salt = randomSalt(); $("salt").value = state.salt; recompute(); });
+$("only-sens").addEventListener("change", renderBA);
+$("btn-dl-csv").addEventListener("click", () => download(toCSV(state.out.headers, state.out.rows, state.dataset.delim), outName("_anonimizado.csv"), "text/csv;charset=utf-8"));
+$("btn-cp-csv").addEventListener("click", () => copy(toCSV(state.out.headers, state.out.rows, state.dataset.delim), "CSV"));
+$("btn-dl-rep").addEventListener("click", () => download(reportText(), outName("_relatorio.txt"), "text/plain;charset=utf-8"));
+$("btn-cp-rep").addEventListener("click", () => copy(reportText(), "Relatório"));
+
+/* =====================================================================
+   11. AUTOTESTES
+   ===================================================================== */
+async function runTests() {
+  const T = [];
+  const t = (name, got, exp) => T.push({ name, exp, got, ok: JSON.stringify(got) === JSON.stringify(exp) });
+  t("CPF válido com máscara", isCPF("529.982.247-25"), true);
+  t("CPF válido sem máscara", isCPF("52998224725"), true);
+  t("CPF com dígito verificador errado", isCPF("529.982.247-26"), false);
+  t("CPF com todos os dígitos iguais", isCPF("111.111.111-11"), false);
+  t("CNPJ válido", isCNPJ("11.222.333/0001-81"), true);
+  t("CNPJ com DV errado", isCNPJ("11.222.333/0001-82"), false);
+  t("E-mail válido", isEmail("ana.lima@exemplo.com.br"), true);
+  t("E-mail sem domínio", isEmail("ana@"), false);
+  t("Celular com DDD 61", isTelefone("(61) 98765-4321"), true);
+  t("Fixo com DDD 11", isTelefone("11 3322-4455"), true);
+  t("Telefone com DDD inexistente (20)", isTelefone("(20) 98765-4321"), false);
+  t("Celular de 11 dígitos sem o 9", isTelefone("(61) 88765-4321"), false);
+  t("CEP", isCEP("70040-010"), true);
+  t("Data válida", isData("29/02/2000"), true);
+  t("Data inexistente (31/02)", isData("31/02/1990"), false);
+  t("Placa Mercosul", isPlaca("BRA2E19"), true);
+  t("Placa padrão antigo", isPlaca("JKL-1234"), true);
+  t("Cartão de teste Visa (Luhn)", isCartao("4111 1111 1111 1111"), true);
+  t("Cartão com Luhn inválido", isCartao("4111 1111 1111 1112"), false);
+  t("RG com pontuação", isRG("12.345.678-9"), true);
+  t("Nome completo", isNome("Ana Lima de Souza"), true);
+  t("Ordem: 11 dígitos de CPF vira CPF", detectValue("52998224725"), "cpf");
+  t("Máscara de CPF no padrão gov", maskValue("529.982.247-25", "cpf"), "***.982.247-**");
+  t("Máscara de cartão", maskValue("5555 5555 5555 4444", "cartao"), "**** **** **** 4444");
+  t("Máscara de e-mail", maskValue("ana.lima@exemplo.com.br", "email"), "a***@e***.com.br");
+  t("Máscara de telefone", maskValue("(61) 98765-4321", "telefone"), "(61) 9****-4321");
+  t("CPF generalizado pela região fiscal (9º dígito)", generalizeValue("529.982.247-25", "cpf"), "região fiscal ES, RJ");
+  t("Faixa etária", ageBand(new Date(1990, 5, 1), new Date(2026, 10, 1)), "30–39 anos");
+  t("CEP generalizado para 5 dígitos", generalizeValue("70040-010", "cep"), "70040");
+  t("Busca em texto livre", scanText("Ligar no (11) 98877-6655 ou ana@x.com").map(s => s.type), ["telefone", "email"]);
+  t("Parser CSV com aspas e delimitador no campo", parseCSV('a;b\n"x;y";"diz ""oi"""\n', ";"), [["a", "b"], ["x;y", 'diz "oi"']]);
+  t("Detecção de delimitador", detectDelimiter("nome;cpf;email\n"), ";");
+  t("SHA-256 em JS puro ('abc')", sha256js("abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+  t("Web Crypto e fallback dão o mesmo hash", await sha256("salt|cpf|52998224725"), sha256js("salt|cpf|52998224725"));
+  t("Mesmo salt gera o mesmo pseudônimo", hashKey("s", "cpf", "529.982.247-25") === hashKey("s", "cpf", "52998224725"), true);
+
+  const passed = T.filter(x => x.ok).length;
+  $("tests-table").tBodies[0].innerHTML = T.map((x, i) => `<tr>
+    <td class="rn">${i + 1}</td><td>${esc(x.name)}</td>
+    <td class="data">${esc(JSON.stringify(x.exp))}</td><td class="data">${esc(JSON.stringify(x.got))}</td>
+    <td class="res ${x.ok ? "pass" : "fail"}">${x.ok ? "passou" : "falhou"}</td></tr>`).join("");
+  $("tests-big").textContent = `${passed}/${T.length}`;
+  $("tests-big").className = "big " + (passed === T.length ? "pass" : "fail");
+  $("tests-desc").textContent = passed === T.length ? "testes passando" : `${T.length - passed} falhando`;
+  const pill = $("tests-pill");
+  pill.textContent = `${passed}/${T.length}`;
+  pill.className = "pill " + (passed === T.length ? "ok" : "bad");
+}
+$("btn-rerun").addEventListener("click", runTests);
+
+/* =====================================================================
+   12. INÍCIO
+   ===================================================================== */
+state.salt = randomSalt();
+$("salt").value = state.salt;
+loadText(sampleCSV(), "clientes_exemplo.csv");
+runTests();
+</script>
+</body>
+</html>

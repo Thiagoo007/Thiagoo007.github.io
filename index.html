@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thiago Moreira</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Layout: hero tipográfico + "log de migrations" da carreira; projetos em linhas numeradas, não em cards iguais */
+  --ink: #0b0f1a;          /* fundo, azul-noite */
+  --ink-2: #131a2b;        /* superfícies */
+  --line: #24304a;         /* divisórias */
+  --paper: #eef1f7;        /* texto principal */
+  --muted: #8b96ad;        /* texto secundário */
+  --flare: #ff6b35;        /* acento laranja */
+  --ok: #4fd1a1;           /* status SUCCESS */
+  --display: "Bricolage Grotesque", "Arial Black", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--body);
+  font-size: 17px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--flare); outline-offset: 3px; border-radius: 4px; }
+.wrap { max-width: 1160px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 40px); }
+
+/* ---------- topo ---------- */
+.nav {
+  display: flex; justify-content: space-between; align-items: center; gap: 16px;
+  padding: 22px 0; font-family: var(--mono); font-size: 13px; color: var(--muted);
+}
+.nav .mark { color: var(--paper); font-weight: 600; letter-spacing: .02em; }
+.nav .mark span { color: var(--flare); }
+.nav ul { display: flex; gap: 22px; list-style: none; margin: 0; padding: 0; flex-wrap: wrap; }
+.nav a { text-decoration: none; }
+.nav a:hover { color: var(--paper); }
+
+/* ---------- hero ---------- */
+.hero {
+  display: grid; grid-template-columns: 1.15fr .85fr; gap: clamp(28px, 5vw, 64px);
+  align-items: end; padding: clamp(40px, 8vw, 96px) 0 clamp(48px, 7vw, 88px);
+  border-bottom: 1px solid var(--line);
+}
+.kicker { font-family: var(--mono); font-size: 13px; color: var(--flare); margin: 0 0 18px; }
+h1 {
+  font-family: var(--display); font-weight: 800; margin: 0;
+  font-size: clamp(64px, 11.5vw, 156px); line-height: .86; letter-spacing: -.045em;
+  text-wrap: balance;
+}
+h1 .last { display: block; color: transparent; -webkit-text-stroke: 2px var(--paper); }
+.lede { max-width: 34ch; font-size: clamp(18px, 2vw, 21px); color: var(--paper); margin: 28px 0 0; }
+.lede em { font-style: normal; color: var(--flare); }
+.ctas { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 30px; }
+.btn {
+  font-family: var(--mono); font-size: 14px; font-weight: 600; text-decoration: none;
+  padding: 12px 18px; border-radius: 6px; border: 1px solid var(--line);
+  transition: transform .15s ease, border-color .15s ease, background .15s ease;
+}
+.btn.primary { background: var(--flare); border-color: var(--flare); color: var(--ink); }
+.btn:hover { transform: translateY(-2px); border-color: var(--flare); }
+
+/* log de migrations */
+.log {
+  background: var(--ink-2); border: 1px solid var(--line); border-radius: 10px;
+  font-family: var(--mono); font-size: 12.5px; overflow: hidden;
+}
+.log-head {
+  display: flex; justify-content: space-between; gap: 8px; padding: 12px 16px;
+  border-bottom: 1px solid var(--line); color: var(--muted);
+}
+.log-head b { color: var(--paper); font-weight: 600; }
+.log table { width: 100%; border-collapse: collapse; }
+.log td { padding: 10px 16px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.log tr:last-child td { border-bottom: 0; }
+.log .v { color: var(--flare); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.log .d { color: var(--paper); }
+.log .s { color: var(--ok); text-align: right; white-space: nowrap; }
+.log .s.run { color: var(--flare); }
+.log .s.run::after { content: "▍"; margin-left: 2px; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ---------- seções ---------- */
+section { padding: clamp(56px, 8vw, 104px) 0; border-bottom: 1px solid var(--line); }
+.sec-head { display: grid; grid-template-columns: 220px 1fr; gap: 32px; margin-bottom: 44px; align-items: baseline; }
+.sec-tag { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.sec-tag b { color: var(--flare); font-weight: 600; }
+h2 {
+  font-family: var(--display); font-weight: 700; margin: 0;
+  font-size: clamp(34px, 5vw, 58px); line-height: 1; letter-spacing: -.03em; text-wrap: balance;
+}
+
+/* sobre */
+.about { display: grid; grid-template-columns: 220px 1fr; gap: 32px; }
+.about-body { max-width: 65ch; }
+.about-body p { margin: 0 0 18px; color: #c9d0de; }
+.about-body p:first-child { font-size: 21px; color: var(--paper); line-height: 1.5; }
+.facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-top: 36px; }
+.fact { background: var(--ink); padding: 20px; }
+.fact .k { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.fact .val { font-family: var(--display); font-size: 22px; font-weight: 700; margin-top: 6px; line-height: 1.2; }
+
+/* princípios */
+.rules { list-style: none; margin: 36px 0 0; padding: 0; display: grid; gap: 10px; }
+.rules li { font-family: var(--mono); font-size: 14px; color: #c9d0de; display: flex; gap: 12px; }
+.rules li::before { content: "--"; color: var(--flare); flex: none; }
+
+/* projetos */
+.featured {
+  display: grid; grid-template-columns: 1.1fr .9fr; gap: 0;
+  border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin-bottom: 28px;
+  background: var(--ink-2);
+}
+.featured .main { padding: clamp(24px, 4vw, 44px); }
+.featured .side { padding: clamp(24px, 4vw, 44px); border-left: 1px solid var(--line); background: var(--ink); }
+.badge { display: inline-block; font-family: var(--mono); font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--flare); color: var(--flare); }
+.featured h3 { font-family: var(--display); font-size: clamp(30px, 4vw, 44px); line-height: 1.02; letter-spacing: -.03em; margin: 18px 0 14px; }
+.featured p { color: #c9d0de; margin: 0 0 14px; max-width: 58ch; }
+.role { font-family: var(--mono); font-size: 13px; color: var(--paper); }
+.side h4 { font-family: var(--mono); font-size: 12px; color: var(--muted); font-weight: 400; margin: 0 0 14px; text-transform: uppercase; letter-spacing: .08em; }
+.side ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.side li { padding-left: 18px; position: relative; color: #c9d0de; font-size: 15.5px; line-height: 1.5; }
+.side li::before { content: ""; position: absolute; left: 0; top: .62em; width: 7px; height: 7px; background: var(--flare); }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.chip { font-family: var(--mono); font-size: 12px; padding: 4px 9px; border-radius: 4px; background: var(--line); color: var(--paper); }
+
+.proj-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.proj {
+  display: grid; grid-template-columns: 72px 1fr 1.2fr; gap: 24px; align-items: start;
+  padding: 30px 0; border-bottom: 1px solid var(--line);
+  transition: background .2s ease, padding .2s ease;
+}
+.proj:hover { background: linear-gradient(90deg, rgba(255,107,53,.07), transparent 70%); }
+.proj .n { font-family: var(--display); font-size: 40px; font-weight: 800; color: var(--line); line-height: 1; font-variant-numeric: tabular-nums; transition: color .2s ease; }
+.proj:hover .n { color: var(--flare); }
+.proj h3 { font-family: var(--display); font-size: 26px; font-weight: 700; letter-spacing: -.02em; margin: 0 0 6px; line-height: 1.1; }
+.proj .what { font-family: var(--mono); font-size: 12.5px; color: var(--muted); }
+.proj p { margin: 0; color: #c9d0de; font-size: 16px; }
+.proj .chips { margin-top: 12px; }
+.status { font-family: var(--mono); font-size: 12px; color: var(--ok); }
+.status.wip { color: var(--flare); }
+
+/* trajetória */
+.exp { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.exp li { display: grid; grid-template-columns: 180px 1fr 1.2fr; gap: 24px; padding: 26px 0; border-bottom: 1px solid var(--line); align-items: start; }
+.exp .when { font-family: var(--mono); font-size: 13px; color: var(--flare); font-variant-numeric: tabular-nums; padding-top: 4px; }
+.exp h3 { font-family: var(--display); font-size: 22px; font-weight: 700; letter-spacing: -.02em; margin: 0 0 4px; line-height: 1.15; }
+.exp .org { font-family: var(--mono); font-size: 12.5px; color: var(--muted); }
+.exp p { margin: 0; color: #c9d0de; font-size: 16px; }
+.edu { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-top: 36px; }
+.edu-item { background: var(--ink); padding: 20px; }
+.edu-item .k { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.edu-item .val { font-family: var(--display); font-size: 19px; font-weight: 700; margin-top: 6px; line-height: 1.2; }
+.edu-item .sub { font-size: 14px; color: var(--muted); margin-top: 6px; }
+.quote { margin: 40px 0 0; padding: 0 0 0 24px; border-left: 3px solid var(--flare); }
+.quote p { font-family: var(--display); font-size: clamp(24px, 3.2vw, 34px); font-weight: 700; letter-spacing: -.02em; line-height: 1.15; margin: 0 0 10px; text-wrap: balance; }
+.quote cite { font-style: normal; font-family: var(--mono); font-size: 12.5px; color: var(--muted); }
+
+/* projetos (cards com link) */
+.pgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+.pcard { display: flex; flex-direction: column; gap: 10px; padding: 26px; border: 1px solid var(--line); border-radius: 12px; background: var(--ink-2); transition: border-color .2s ease, transform .2s ease; }
+.pcard:hover { border-color: var(--flare); transform: translateY(-3px); }
+.pcard:first-child { grid-column: span 2; }
+.pc-top { display: flex; justify-content: space-between; align-items: center; }
+.pcard .n { font-family: var(--display); font-size: 34px; font-weight: 800; color: var(--line); line-height: 1; transition: color .2s ease; }
+.pcard:hover .n { color: var(--flare); }
+.pcard h3 { font-family: var(--display); font-size: 28px; font-weight: 700; letter-spacing: -.02em; margin: 6px 0 0; line-height: 1.05; }
+.pcard .what { font-family: var(--mono); font-size: 12.5px; color: var(--muted); }
+.pcard p { margin: 4px 0 0; color: #c9d0de; font-size: 15.5px; flex: 1; }
+.pcard .chips { margin-top: 6px; }
+.pc-links { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.others-title { font-family: var(--mono); font-size: 13px; font-weight: 400; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin: 56px 0 8px; }
+.others { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.others li { display: grid; grid-template-columns: 240px 1fr; gap: 24px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.others b { font-family: var(--display); font-size: 18px; }
+.others span { color: #c9d0de; font-size: 15.5px; }
+@media (max-width: 760px) { .pcard:first-child { grid-column: auto; } .others li { grid-template-columns: 1fr; gap: 4px; } }
+
+/* stack */
+.stack { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.stack div { background: var(--ink); padding: 24px; }
+.stack h4 { font-family: var(--mono); font-size: 12px; font-weight: 400; color: var(--flare); margin: 0 0 14px; text-transform: uppercase; letter-spacing: .08em; }
+.stack ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.stack li { font-size: 16px; }
+
+/* contato */
+.contact { text-align: left; }
+.contact h2 { font-size: clamp(44px, 8vw, 104px); line-height: .92; letter-spacing: -.045em; max-width: 12ch; }
+.contact h2 span { color: var(--flare); }
+.links { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 44px; }
+.link {
+  display: block; text-decoration: none; padding: 20px 22px; border: 1px solid var(--line); border-radius: 10px;
+  transition: border-color .15s ease, transform .15s ease;
+}
+.link:hover { border-color: var(--flare); transform: translateY(-2px); }
+.link .k { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.link .val { font-size: 17px; margin-top: 6px; word-break: break-word; }
+.link .val.todo { color: var(--flare); font-family: var(--mono); font-size: 14px; }
+
+footer { padding: 28px 0 40px; font-family: var(--mono); font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+/* ---------- responsivo ---------- */
+@media (max-width: 900px) {
+  .hero, .featured { grid-template-columns: 1fr; }
+  .featured .side { border-left: 0; border-top: 1px solid var(--line); }
+  .sec-head, .about { grid-template-columns: 1fr; gap: 12px; }
+  .stack { grid-template-columns: repeat(2, 1fr); }
+  .proj { grid-template-columns: 56px 1fr; }
+  .proj > p, .proj > .desc { grid-column: 2; }
+  .links { grid-template-columns: 1fr; }
+  .exp li { grid-template-columns: 1fr; gap: 8px; }
+  .edu { grid-template-columns: 1fr; }
+}
+@media (max-width: 480px) {
+  .facts { grid-template-columns: 1fr; }
+  .stack { grid-template-columns: 1fr; }
+  .proj { grid-template-columns: 1fr; gap: 10px; }
+  .proj > p, .proj > .desc { grid-column: 1; }
+  .nav ul { gap: 14px; }
+  h1 .last { -webkit-text-stroke-width: 1.5px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="nav">
+    <div class="mark">thiago<span>.</span>moreira</div>
+    <nav aria-label="Seções">
+      <ul>
+        <li><a href="#sobre">sobre</a></li>
+        <li><a href="#trajetoria">trajetória</a></li>
+        <li><a href="#projetos">projetos</a></li>
+        <li><a href="#stack">stack</a></li>
+        <li><a href="#contato">contato</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <div class="hero">
+    <div>
+      <p class="kicker">// desenvolvedor backend &amp; dados · Brasília, DF</p>
+      <h1>Thiago<span class="last">Moreira</span></h1>
+      <p class="lede">Construo sistemas que <em>não podem errar o dado</em>: regras de negócio complexas, banco de dados bem modelado e migrações que sobem sem susto.</p>
+      <div class="ctas">
+        <a class="btn primary" href="#projetos">Ver projetos</a>
+        <a class="btn" href="#contato">Falar comigo</a>
+      </div>
+    </div>
+
+    <div class="log" role="table" aria-label="Histórico da carreira em formato de log de migrations">
+      <div class="log-head"><b>carreira_schema_history</b><span>flyway info</span></div>
+      <table>
+        <tbody>
+          <tr><td class="v">V2024.02</td><td class="d">suporte_tecnico_iesb</td><td class="s">SUCCESS</td></tr>
+          <tr><td class="v">V2024.10</td><td class="d">analista_bi_cldf</td><td class="s">SUCCESS</td></tr>
+          <tr><td class="v">V2026.02</td><td class="d">ads_iesb_concluido</td><td class="s">SUCCESS</td></tr>
+          <tr><td class="v">V2026.02</td><td class="d">analista_dev_ste_engenharia</td><td class="s">SUCCESS</td></tr>
+          <tr><td class="v">V2026.xx</td><td class="d">seguranca_informacao_unb_dnit</td><td class="s">SUCCESS</td></tr>
+          <tr><td class="v">V&#8203;next</td><td class="d">proximo_desafio</td><td class="s run">PENDING</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- SOBRE -->
+  <section id="sobre">
+    <div class="about">
+      <div class="sec-tag"><b>01</b> / sobre</div>
+      <div class="about-body">
+        <p>Sou Analista de Desenvolvimento de Sistemas na STE Engenharia, onde trabalho no backend e no banco de dados de sistemas corporativos para o setor público.</p>
+        <p>Sou formado em Análise e Desenvolvimento de Sistemas pelo Centro Universitário IESB, em Brasília. No dia a dia trabalho com Java e Spring Boot no servidor, Angular na interface e PostgreSQL no centro de tudo. Cuido de modelagem, migrações e do roteiro de execução com teste e reversão.</p>
+        <p>Antes disso, fui Analista de BI na Câmara Legislativa do Distrito Federal, montando dashboards em Power BI, consultas SQL e processos de ETL para apoiar decisões estratégicas. Também passei pelo suporte técnico do IESB. Essa base em dados é o que me faz cuidar tanto do banco hoje.</p>
+        <p>Gosto de traduzir regra de negócio difícil em modelo de dados e código que dá para confiar. Fora do trabalho, desenvolvo meus próprios produtos: CRM, gestão de hospedagem, bot de atendimento, loja virtual e um app de acessibilidade com IA.</p>
+
+        <div class="facts">
+          <div class="fact"><div class="k">cargo</div><div class="val">Analista de Desenvolvimento</div></div>
+          <div class="fact"><div class="k">formação</div><div class="val">ADS · IESB, 2026</div></div>
+          <div class="fact"><div class="k">foco</div><div class="val">Backend e banco de dados</div></div>
+        </div>
+
+        <ul class="rules" aria-label="Como eu trabalho">
+          <li>Diagnóstico antes de qualquer ação destrutiva.</li>
+          <li>Todo script de banco roda antes em dry-run, com ROLLBACK.</li>
+          <li>Entrega em pacotes por funcionalidade, cada um com teste e plano de reversão.</li>
+          <li>Regra de negócio se confirma com quem conhece o negócio, não se adivinha.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- TRAJETÓRIA -->
+  <section id="trajetoria">
+    <div class="sec-head">
+      <div class="sec-tag"><b>02</b> / trajetória</div>
+      <h2>Onde eu já atuei</h2>
+    </div>
+    <ol class="exp">
+      <li>
+        <div class="when">fev. 2026 – hoje</div>
+        <div><h3>Analista de Desenvolvimento de Sistemas</h3><div class="org">STE Engenharia</div></div>
+        <p>Desenvolvimento backend e banco de dados de sistemas corporativos: modelagem, migrações versionadas, regras de negócio e testes automatizados. Java 21, Spring Boot, Angular e PostgreSQL.</p>
+      </li>
+      <li>
+        <div class="when">out. 2024 – dez. 2025</div>
+        <div><h3>Analista de BI Jr</h3><div class="org">Câmara Legislativa do Distrito Federal · estágio</div></div>
+        <p>Dashboards e relatórios em Power BI para a tomada de decisão, com SQL, ETL e análise de dados.</p>
+      </li>
+      <li>
+        <div class="when">fev. 2024 – jan. 2025</div>
+        <div><h3>Suporte técnico</h3><div class="org">IESB · estágio</div></div>
+        <p>Atendimento e suporte técnico, com atenção a boas práticas de segurança da informação.</p>
+      </li>
+    </ol>
+
+    <div class="edu">
+      <div class="edu-item"><div class="k">formação</div><div class="val">Análise e Desenvolvimento de Sistemas</div><div class="sub">Centro Universitário IESB · concluído em 2026</div></div>
+      <div class="edu-item"><div class="k">capacitação</div><div class="val">Segurança da Informação</div><div class="sub">UnB / DNIT · LGPD, proteção de dados e riscos</div></div>
+      <div class="edu-item"><div class="k">curso</div><div class="val">Power BI para BI e Data Science</div><div class="sub">Data Science Academy · DAX, linguagem M e SQL</div></div>
+    </div>
+
+    <blockquote class="quote">
+      <p>“Excelente postura profissional e vontade de aprender.”</p>
+      <cite>Fábio Virgílio de Souza Neves · Consultor Técnico-Legislativo, CLDF</cite>
+    </blockquote>
+  </section>
+
+  <!-- PROJETOS -->
+  <section id="projetos">
+    <div class="sec-head">
+      <div class="sec-tag"><b>03</b> / projetos</div>
+      <h2>Projetos rodando</h2>
+    </div>
+
+
+    <div class="pgrid">
+      <article class="pcard">
+        <div class="pc-top"><span class="n">01</span><span class="status">● online</span></div>
+        <h3>Radar de Licitações</h3>
+        <div class="what">painel de editais · Lei 14.133</div>
+        <p>Painel com 60 editais fictícios que calcula os prazos mínimos de publicação do art. 55 em dias úteis, com feriados móveis, e aponta os editais com prazo irregular. Tem filtros, gráfico por UF e modalidade, agenda de aberturas e exportação em CSV.</p>
+        <div class="chips"><span class="chip">JavaScript</span><span class="chip">regras em funções puras</span><span class="chip">SVG</span><span class="chip">21 testes</span></div>
+        <div class="pc-links">
+          <a class="btn primary" href="radar-licitacoes/index.html">Abrir projeto ↗</a>
+          <a class="btn" href="https://github.com/Thiagoo007/Thiagoo007.github.io/tree/main/radar-licitacoes" target="_blank" rel="noopener">Código</a>
+        </div>
+      </article>
+      <article class="pcard">
+        <div class="pc-top"><span class="n">02</span><span class="status">● online</span></div>
+        <h3>Schema Lab</h3>
+        <div class="what">migrations PostgreSQL · diagrama e riscos</div>
+        <p>Você cola migrations no padrão Flyway e o app desenha o diagrama do banco em cada versão, aponta riscos como DROP sem backup, NOT NULL sem default e índice sem CONCURRENTLY, e gera o rollback e um roteiro de dry-run.</p>
+        <div class="chips"><span class="chip">parser SQL próprio</span><span class="chip">PostgreSQL</span><span class="chip">Flyway</span><span class="chip">22 testes</span></div>
+        <div class="pc-links">
+          <a class="btn primary" href="schema-lab/index.html">Abrir projeto ↗</a>
+          <a class="btn" href="https://github.com/Thiagoo007/Thiagoo007.github.io/tree/main/schema-lab" target="_blank" rel="noopener">Código</a>
+        </div>
+      </article>
+      <article class="pcard">
+        <div class="pc-top"><span class="n">03</span><span class="status">● online</span></div>
+        <h3>Motor de Workflow</h3>
+        <div class="what">máquina de estados · editor e simulador</div>
+        <p>Motor de fluxo de etapas com avanço, retorno, salto, dispensa em cascata e desfazer. Editor visual da régua com validação, simulador com trilha de auditoria imutável e métricas de gargalo por etapa.</p>
+        <div class="chips"><span class="chip">event sourcing</span><span class="chip">SVG</span><span class="chip">JSON</span><span class="chip">26 testes</span></div>
+        <div class="pc-links">
+          <a class="btn primary" href="motor-workflow/index.html">Abrir projeto ↗</a>
+          <a class="btn" href="https://github.com/Thiagoo007/Thiagoo007.github.io/tree/main/motor-workflow" target="_blank" rel="noopener">Código</a>
+        </div>
+      </article>
+      <article class="pcard">
+        <div class="pc-top"><span class="n">04</span><span class="status">● online</span></div>
+        <h3>Guardião LGPD</h3>
+        <div class="what">anonimização de dados · 100% local</div>
+        <p>Detecta CPF, CNPJ, e-mail, telefone, cartão e outros dados pessoais em planilhas CSV, validando de verdade cada um (dígito verificador, Luhn, DDD). Calcula o risco de exposição e trata cada coluna com máscara, pseudônimo SHA-256 com salt ou generalização.</p>
+        <div class="chips"><span class="chip">Web Crypto</span><span class="chip">CSV</span><span class="chip">LGPD</span><span class="chip">35 testes</span></div>
+        <div class="pc-links">
+          <a class="btn primary" href="guardiao-lgpd/index.html">Abrir projeto ↗</a>
+          <a class="btn" href="https://github.com/Thiagoo007/Thiagoo007.github.io/tree/main/guardiao-lgpd" target="_blank" rel="noopener">Código</a>
+        </div>
+      </article>
+      <article class="pcard">
+        <div class="pc-top"><span class="n">05</span><span class="status">● online</span></div>
+        <h3>Pousada Manager</h3>
+        <div class="what">gestão de hospedagem · reservas e chatbot</div>
+        <p>Mapa de ocupação, reservas sem overbooking, tarifa noite a noite com alta temporada e feriados, check-in e check-out com consumo, e painel com ocupação, diária média e RevPAR. Tem ainda um chatbot que entende perguntas em português e consulta a disponibilidade real.</p>
+        <div class="chips"><span class="chip">regras de negócio</span><span class="chip">NLP por regras</span><span class="chip">SVG</span><span class="chip">29 testes</span></div>
+        <div class="pc-links">
+          <a class="btn primary" href="pousada-manager/index.html">Abrir projeto ↗</a>
+          <a class="btn" href="https://github.com/Thiagoo007/Thiagoo007.github.io/tree/main/pousada-manager" target="_blank" rel="noopener">Código</a>
+        </div>
+      </article>
+    </div>
+    <h3 class="others-title">Outros projetos</h3>
+    <ul class="others">
+      <li><b>Conecta CRM</b><span>CRM para gestão de associações, com login por reconhecimento facial em desenvolvimento.</span></li>
+      <li><b>Visão em Voz</b><span>App que analisa imagens com IA e responde em voz. TypeScript, Express e Gemini.</span></li>
+      <li><b>Sistema Pousada da Nita</b><span>Gestão de hospedagem para uma pousada real, com bot de atendimento no WhatsApp.</span></li>
+      <li><b>Dashboards de BI</b><span>Vendas globais e análise financeira em Power BI, com DAX e SQL.</span></li>
+      <li><b>Moreira Enxoval</b><span>Loja virtual de cama, mesa e banho, nova versão em andamento.</span></li>
+    </ul>
+  </section>
+
+  <!-- STACK -->
+  <section id="stack">
+    <div class="sec-head">
+      <div class="sec-tag"><b>04</b> / stack</div>
+      <h2>Com o que eu trabalho</h2>
+    </div>
+    <div class="stack">
+      <div><h4>Backend</h4><ul><li>Java 21</li><li>Spring Boot 3.5</li><li>Node.js · Express</li><li>TypeScript</li></ul></div>
+      <div><h4>Banco de dados</h4><ul><li>PostgreSQL</li><li>Flyway</li><li>Modelagem e migrações</li><li>SQL de diagnóstico</li></ul></div>
+      <div><h4>Frontend</h4><ul><li>Angular</li><li>HTML e CSS</li><li>Protótipos de UX</li></ul></div>
+      <div><h4>Dados e IA</h4><ul><li>Python · Pandas</li><li>Power BI · DAX · M</li><li>MySQL · ETL</li><li>Gemini API</li></ul></div>
+    </div>
+  </section>
+
+  <!-- CONTATO -->
+  <section id="contato" class="contact">
+    <div class="sec-tag" style="margin-bottom:20px"><b>05</b> / contato</div>
+    <h2>Vamos conversar<span>.</span></h2>
+    <p style="color:#c9d0de;max-width:52ch;margin-top:22px">Aberto a projetos, parcerias e boas conversas sobre backend, dados e sistemas para o setor público.</p>
+    <div class="links">
+      <a class="link" href="#contato"><div class="k">e-mail</div><div class="val todo">[seu e-mail]</div></a>
+      <a class="link" href="https://www.linkedin.com/in/thiago-moreira-29a0442aa/" target="_blank" rel="noopener"><div class="k">linkedin</div><div class="val">in/thiago-moreira ↗</div></a>
+      <a class="link" href="https://github.com/Thiagoo007" target="_blank" rel="noopener"><div class="k">github</div><div class="val">Thiagoo007 ↗</div></a>
+    </div>
+  </section>
+
+  <footer>
+    <span>© 2026 Thiago Moreira</span>
+    <span>Brasília, DF</span>
+  </footer>
+</div>
+
+</body>
+</html>

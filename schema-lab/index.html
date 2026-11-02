@@ -1,0 +1,1789 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Schema Lab</title>
+<meta name="description" content="Schema Lab: cole migrations PostgreSQL no estilo Flyway e veja o diagrama do banco, os riscos de cada mudança, o rollback sugerido e um plano de dry-run.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Layout: editor de migrations à esquerda, diagrama ER com linha do tempo à direita; painéis de análise embaixo */
+  --ink: #0b0f1a;
+  --ink-2: #131a2b;
+  --ink-3: #1a2338;
+  --line: #24304a;
+  --paper: #eef1f7;
+  --soft: #c9d0de;
+  --muted: #8b96ad;
+  --flare: #ff6b35;
+  --ok: #4fd1a1;
+  --crit: #ff4d6d;
+  --med: #ffc857;
+  --low: #6aa8ff;
+  --display: "Bricolage Grotesque", "Arial Black", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--ink); color: var(--paper); font-family: var(--body); font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+a { color: inherit; }
+button, input, textarea, label { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--flare); outline-offset: 2px; border-radius: 4px; }
+.wrap { max-width: 1480px; margin: 0 auto; padding: 0 clamp(16px, 3vw, 32px); }
+
+/* topo */
+.top { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap; padding: 26px 0 22px; border-bottom: 1px solid var(--line); }
+.brand h1 { font-family: var(--display); font-weight: 800; font-size: clamp(34px, 4.6vw, 54px); letter-spacing: -.04em; line-height: .95; margin: 0; }
+.brand h1 span { color: var(--flare); }
+.brand p { margin: 8px 0 0; color: var(--soft); max-width: 62ch; }
+.by { font-family: var(--mono); font-size: 12.5px; color: var(--muted); display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.by a { text-decoration: none; color: var(--paper); border-bottom: 1px solid var(--flare); }
+.by a:hover { color: var(--flare); }
+
+/* grade principal */
+.app { display: grid; grid-template-columns: minmax(380px, .85fr) 1.15fr; gap: 18px; padding: 20px 0; }
+.card { background: var(--ink-2); border: 1px solid var(--line); border-radius: 12px; min-width: 0; display: flex; flex-direction: column; }
+.card-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.card-title { font-family: var(--mono); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.card-title b { color: var(--paper); font-weight: 600; }
+.tools { display: flex; gap: 6px; flex-wrap: wrap; }
+.btn { background: var(--ink-3); border: 1px solid var(--line); border-radius: 6px; padding: 6px 11px; font-family: var(--mono); font-size: 12px; cursor: pointer; transition: border-color .15s, color .15s; }
+.btn:hover { border-color: var(--flare); color: var(--flare); }
+.btn.primary { background: var(--flare); border-color: var(--flare); color: var(--ink); font-weight: 600; }
+.btn.primary:hover { color: var(--ink); filter: brightness(1.08); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* editor */
+.editor { display: grid; grid-template-columns: 46px 1fr; height: 600px; position: relative; }
+.gutter { margin: 0; padding: 12px 0; overflow: hidden; background: var(--ink); border-right: 1px solid var(--line); border-bottom-left-radius: 12px; font-family: var(--mono); font-size: 12.5px; line-height: 20px; color: #4a5672; text-align: right; user-select: none; }
+.gutter div { padding-right: 8px; height: 20px; }
+.gutter .hd { color: var(--muted); }
+.gutter .m-crit { color: var(--crit); font-weight: 600; box-shadow: inset 3px 0 0 var(--crit); }
+.gutter .m-alto { color: var(--flare); font-weight: 600; box-shadow: inset 3px 0 0 var(--flare); }
+.gutter .m-medio { color: var(--med); box-shadow: inset 3px 0 0 var(--med); }
+.gutter .m-baixo { color: var(--low); box-shadow: inset 3px 0 0 var(--low); }
+.gutter .m-erro { color: var(--crit); font-weight: 600; box-shadow: inset 3px 0 0 var(--crit); }
+textarea#sql { width: 100%; height: 100%; resize: none; border: 0; outline: none; background: var(--ink); color: var(--paper); padding: 12px 14px; font-family: var(--mono); font-size: 12.5px; line-height: 20px; white-space: pre; overflow: auto; tab-size: 2; border-bottom-right-radius: 12px; }
+textarea#sql:focus-visible { box-shadow: inset 0 0 0 2px var(--flare); border-radius: 0 0 12px 0; }
+.status-line { font-family: var(--mono); font-size: 12px; color: var(--muted); padding: 8px 14px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.status-line .okc { color: var(--ok); }
+.status-line .badc { color: var(--crit); }
+
+/* linha do tempo */
+.timeline { display: flex; gap: 6px; padding: 12px 14px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.tl { flex: 0 0 auto; min-width: 104px; max-width: 170px; text-align: left; background: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; cursor: pointer; position: relative; transition: border-color .15s; }
+.tl:hover { border-color: var(--muted); }
+.tl[aria-pressed="true"] { border-color: var(--flare); background: rgba(255,107,53,.08); }
+.tl .v { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--flare); display: flex; justify-content: space-between; gap: 6px; }
+.tl .n { font-size: 11.5px; color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.dot { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 400; color: var(--muted); }
+.dot::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+.dot.crit::before { background: var(--crit); } .dot.alto::before { background: var(--flare); } .dot.medio::before { background: var(--med); } .dot.baixo::before { background: var(--low); } .dot.erro::before { background: var(--crit); }
+
+/* diagrama */
+.canvas { height: 470px; overflow: auto; background:
+  radial-gradient(circle at 1px 1px, #1d2740 1px, transparent 0) 0 0 / 22px 22px, var(--ink); position: relative; }
+.canvas svg { display: block; touch-action: none; }
+.canvas .empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-family: var(--mono); font-size: 13px; text-align: center; padding: 20px; }
+.tbl { cursor: grab; }
+.tbl:active { cursor: grabbing; }
+.tbl:focus { outline: none; }
+.tbl:focus .tbox { stroke: var(--flare); stroke-width: 2; }
+.tbox { fill: var(--ink-2); stroke: var(--line); stroke-width: 1; }
+.thead { fill: var(--ink-3); }
+.tbl.new .tbox { stroke: var(--flare); stroke-width: 1.6; }
+.tbl.new .thead { fill: #2a1d1a; }
+.tname { font-family: var(--display); font-weight: 700; font-size: 14px; fill: var(--paper); }
+.tnew { font-family: var(--mono); font-size: 9.5px; fill: var(--flare); }
+.cname { font-family: var(--mono); font-size: 11.5px; fill: var(--soft); }
+.ctype { font-family: var(--mono); font-size: 11px; fill: var(--muted); }
+.row.pk .cname { fill: var(--paper); font-weight: 600; }
+.row.new .cname { fill: var(--flare); }
+.row.chg .ctype { fill: var(--flare); }
+.badge-pk { font-family: var(--mono); font-size: 8.5px; font-weight: 600; fill: var(--med); }
+.badge-fk { font-family: var(--mono); font-size: 8.5px; font-weight: 600; fill: var(--low); }
+.rowline { stroke: #1c2539; }
+.edge { fill: none; stroke: #5d6a86; stroke-width: 1.4; }
+.edge.new { stroke: var(--flare); stroke-width: 1.8; }
+.edge-end { fill: var(--ink); stroke: #5d6a86; stroke-width: 1.4; }
+.edge-end.new { stroke: var(--flare); }
+.edge-start { fill: #5d6a86; }
+.edge-start.new { fill: var(--flare); }
+.diag-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-family: var(--mono); font-size: 11.5px; }
+.legend i { font-style: normal; font-weight: 600; }
+.stats { font-family: var(--mono); font-size: 12px; color: var(--soft); padding: 10px 14px; border-top: 1px solid var(--line); display: flex; gap: 18px; flex-wrap: wrap; }
+.stats b { color: var(--paper); font-variant-numeric: tabular-nums; }
+.removed { font-size: 12.5px; color: var(--soft); padding: 0 14px 12px; }
+.removed:empty { display: none; }
+.removed b { color: var(--crit); font-family: var(--mono); font-weight: 600; }
+
+/* painéis */
+.panels { margin-bottom: 40px; }
+.tabs { display: flex; gap: 4px; padding: 8px 8px 0; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.tab { background: none; border: 0; border-bottom: 2px solid transparent; padding: 9px 14px; cursor: pointer; font-family: var(--mono); font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+.tab:hover { color: var(--paper); }
+.tab[aria-selected="true"] { color: var(--paper); border-bottom-color: var(--flare); }
+.tab .cnt { margin-left: 6px; font-size: 11px; padding: 1px 6px; border-radius: 999px; background: var(--line); color: var(--paper); }
+.panel { padding: 18px; }
+.panel[hidden] { display: none; }
+
+.sum { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.pill { font-family: var(--mono); font-size: 11.5px; padding: 3px 9px; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
+.pill.crit, .pill.erro { color: var(--crit); } .pill.alto { color: var(--flare); } .pill.medio { color: var(--med); } .pill.baixo { color: var(--low); } .pill.info { color: var(--muted); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; margin-left: auto; }
+.seg button { background: none; border: 0; padding: 5px 10px; font-family: var(--mono); font-size: 12px; color: var(--muted); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--ink-3); color: var(--paper); }
+.risks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.risk { display: grid; grid-template-columns: 88px 1fr; gap: 14px; padding: 12px 14px; border: 1px solid var(--line); border-left-width: 3px; border-radius: 8px; background: var(--ink); cursor: pointer; text-align: left; width: 100%; }
+.risk:hover { background: #0f1424; }
+.risk.crit, .risk.erro { border-left-color: var(--crit); } .risk.alto { border-left-color: var(--flare); } .risk.medio { border-left-color: var(--med); } .risk.baixo { border-left-color: var(--low); } .risk.info { border-left-color: var(--line); }
+.risk .where { font-family: var(--mono); font-size: 11.5px; color: var(--muted); display: grid; gap: 4px; align-content: start; }
+.risk h3 { margin: 0 0 3px; font-size: 15px; font-weight: 600; }
+.risk p { margin: 0; color: var(--soft); font-size: 13.5px; }
+.risk .fix { margin-top: 6px; font-size: 13px; color: var(--paper); }
+.risk .fix::before { content: "Como corrigir: "; color: var(--ok); font-family: var(--mono); font-size: 12px; }
+.none { color: var(--muted); font-family: var(--mono); font-size: 13px; padding: 10px 0; }
+
+.code-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.code-head h3 { margin: 0; font-family: var(--mono); font-size: 13.5px; font-weight: 600; }
+.code-head p { margin: 4px 0 0; color: var(--muted); font-size: 13px; max-width: 80ch; }
+pre.code { margin: 0; background: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; overflow-x: auto; font-family: var(--mono); font-size: 12.5px; line-height: 1.65; color: var(--paper); }
+pre.code .k { color: var(--flare); }
+pre.code .s { color: var(--ok); }
+pre.code .c { color: #66728c; font-style: italic; }
+
+.tests-sum { font-family: var(--display); font-size: 26px; font-weight: 700; letter-spacing: -.02em; margin: 0 0 14px; }
+.tests-sum span { color: var(--ok); }
+.tests-sum.fail span { color: var(--crit); }
+.tests { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 6px; }
+.tests li { font-family: var(--mono); font-size: 12.5px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--ink); display: flex; gap: 10px; align-items: flex-start; }
+.tests .r { font-weight: 600; flex: none; }
+.tests .pass .r { color: var(--ok); }
+.tests .fail { border-color: var(--crit); }
+.tests .fail .r { color: var(--crit); }
+.tests small { display: block; color: var(--crit); }
+
+.about { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+.about h3 { font-family: var(--display); font-size: 22px; letter-spacing: -.02em; margin: 0 0 10px; }
+.about p, .about li { color: var(--soft); max-width: 65ch; }
+.about ul { padding-left: 18px; margin: 0; display: grid; gap: 6px; }
+.pipeline { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; margin: 6px 0 18px; }
+.stage { flex: 1 1 120px; background: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; position: relative; }
+.stage b { display: block; font-family: var(--mono); font-size: 12px; color: var(--flare); }
+.stage span { font-size: 12.5px; color: var(--soft); }
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--paper); color: var(--ink); font-family: var(--mono); font-size: 12.5px; padding: 8px 14px; border-radius: 6px; opacity: 0; pointer-events: none; transition: opacity .2s; }
+.toast.show { opacity: 1; }
+footer { padding: 0 0 30px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+@media (max-width: 1100px) {
+  .app { grid-template-columns: 1fr; }
+  .editor { height: 420px; }
+  .about { grid-template-columns: 1fr; }
+}
+@media (max-width: 520px) {
+  .risk { grid-template-columns: 1fr; gap: 6px; }
+  .canvas { height: 380px; }
+  .seg { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1>Schema<span>/</span>Lab</h1>
+      <p>Cole migrations PostgreSQL no padrão Flyway e veja o banco tomar forma: diagrama de cada versão, riscos de cada comando, rollback sugerido e um plano de dry-run.</p>
+    </div>
+    <div class="by">
+      <span>por Thiago Moreira</span>
+      <a href="https://github.com/Thiagoo007" target="_blank" rel="noopener">github.com/Thiagoo007 ↗</a>
+      <a href="#painel-sobre" id="go-about">sobre o projeto</a>
+    </div>
+  </header>
+
+  <main class="app">
+    <section class="card" aria-labelledby="ed-title">
+      <div class="card-head">
+        <div class="card-title" id="ed-title"><b>Migrations</b> · uma por cabeçalho <span style="text-transform:none">-- V1__nome.sql</span></div>
+        <div class="tools">
+          <button class="btn" id="b-example" type="button">Restaurar exemplo</button>
+          <button class="btn" id="b-clear" type="button">Limpar</button>
+          <label class="btn" for="f-sql">Abrir .sql</label>
+          <input class="sr" type="file" id="f-sql" accept=".sql,text/plain" multiple>
+        </div>
+      </div>
+      <div class="editor">
+        <div class="gutter" id="gutter" aria-hidden="true"></div>
+        <label class="sr" for="sql">Editor de migrations SQL</label>
+        <textarea id="sql" spellcheck="false" autocomplete="off" wrap="off"></textarea>
+      </div>
+      <div class="status-line"><span id="st-parse">analisando…</span><span id="st-lines"></span></div>
+    </section>
+
+    <section class="card" aria-labelledby="dg-title">
+      <div class="card-head">
+        <div class="card-title" id="dg-title"><b>Diagrama</b> · <span id="dg-ver">—</span></div>
+        <div class="tools">
+          <button class="btn" id="z-out" type="button" aria-label="Diminuir zoom">−</button>
+          <button class="btn" id="z-fit" type="button">Ajustar</button>
+          <button class="btn" id="z-in" type="button" aria-label="Aumentar zoom">+</button>
+          <button class="btn" id="z-reset" type="button">Reorganizar</button>
+        </div>
+      </div>
+      <div class="timeline" id="timeline" role="group" aria-label="Versões do schema"></div>
+      <div class="canvas" id="canvas"></div>
+      <div class="diag-foot">
+        <div class="legend">
+          <span><i style="color:var(--med)">PK</i> chave primária</span>
+          <span><i style="color:var(--low)">FK</i> chave estrangeira</span>
+          <span><i style="color:var(--flare)">laranja</i> novo nesta versão</span>
+        </div>
+        <span>Arraste as tabelas. Com uma tabela focada, use as setas.</span>
+      </div>
+      <div class="removed" id="removed"></div>
+      <div class="stats" id="stats"></div>
+    </section>
+  </main>
+
+  <section class="card panels" aria-label="Análise">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="t-riscos" aria-controls="painel-riscos" aria-selected="true">Riscos<span class="cnt" id="cnt-riscos">0</span></button>
+      <button class="tab" role="tab" id="t-rollback" aria-controls="painel-rollback" aria-selected="false">Rollback</button>
+      <button class="tab" role="tab" id="t-dryrun" aria-controls="painel-dryrun" aria-selected="false">Dry-run</button>
+      <button class="tab" role="tab" id="t-testes" aria-controls="painel-testes" aria-selected="false">Testes<span class="cnt" id="cnt-testes">0</span></button>
+      <button class="tab" role="tab" id="t-sobre" aria-controls="painel-sobre" aria-selected="false">Sobre o projeto</button>
+    </div>
+
+    <div class="panel" role="tabpanel" id="painel-riscos" aria-labelledby="t-riscos">
+      <div class="sum" id="risk-sum"></div>
+      <ul class="risks" id="risk-list"></ul>
+    </div>
+
+    <div class="panel" role="tabpanel" id="painel-rollback" aria-labelledby="t-rollback" hidden>
+      <div class="code-head">
+        <div><h3 id="rb-title">Rollback</h3><p>Desfaz a versão selecionada na linha do tempo, comando por comando, em ordem inversa. Revise antes de usar: o que foi apagado com DROP só volta com backup.</p></div>
+        <button class="btn" type="button" data-copy="rb-code">Copiar</button>
+      </div>
+      <pre class="code" id="rb-code"></pre>
+    </div>
+
+    <div class="panel" role="tabpanel" id="painel-dryrun" aria-labelledby="t-dryrun" hidden>
+      <div class="code-head">
+        <div><h3 id="dr-title">Dry-run</h3><p>Roda a versão selecionada dentro de uma transação com timeouts curtos, confere o resultado e termina em ROLLBACK. Nada é gravado.</p></div>
+        <button class="btn" type="button" data-copy="dr-code">Copiar</button>
+      </div>
+      <pre class="code" id="dr-code"></pre>
+    </div>
+
+    <div class="panel" role="tabpanel" id="painel-testes" aria-labelledby="t-testes" hidden>
+      <p class="tests-sum" id="tests-sum"></p>
+      <ul class="tests" id="tests"></ul>
+    </div>
+
+    <div class="panel" role="tabpanel" id="painel-sobre" aria-labelledby="t-sobre" hidden>
+      <div class="about">
+        <div>
+          <h3>Como funciona</h3>
+          <div class="pipeline">
+            <div class="stage"><b>1 · tokenizer</b><span>Lê o SQL caractere a caractere: strings, comentários, $$ e identificadores entre aspas.</span></div>
+            <div class="stage"><b>2 · parser</b><span>Monta a árvore de cada comando: CREATE, ALTER, INDEX, DROP, RENAME.</span></div>
+            <div class="stage"><b>3 · modelo</b><span>Aplica as migrations em ordem e guarda um retrato do schema por versão.</span></div>
+            <div class="stage"><b>4 · regras</b><span>Funções puras comparam o antes e o depois e apontam os riscos.</span></div>
+            <div class="stage"><b>5 · render</b><span>Gera o diagrama em SVG, o rollback e o dry-run.</span></div>
+          </div>
+          <p>Tudo roda no navegador, sem servidor e sem biblioteca: o parser foi escrito à mão para o subconjunto de DDL do PostgreSQL usado em migrations do dia a dia. Cada versão guarda um retrato completo do schema, então a linha do tempo só troca o retrato exibido.</p>
+          <p>O diagrama usa um layout em camadas: tabelas sem dependência ficam à esquerda e cada tabela vai uma coluna à direita de quem ela referencia.</p>
+        </div>
+        <div>
+          <h3>O que o linter verifica</h3>
+          <ul>
+            <li><b>DROP TABLE e DROP COLUMN</b>: perda de dados.</li>
+            <li><b>ADD COLUMN NOT NULL sem DEFAULT</b> em tabela que já existe: falha se houver linhas.</li>
+            <li><b>ALTER COLUMN TYPE</b>: reescreve a tabela com lock exclusivo. Aumentar varchar é tratado como seguro.</li>
+            <li><b>CREATE INDEX sem CONCURRENTLY</b>: bloqueia escrita durante a criação.</li>
+            <li><b>FK sem índice</b> na coluna de origem, e <b>tabela sem PK</b>.</li>
+            <li><b>RENAME</b>: quebra o código que ainda usa o nome antigo.</li>
+            <li><b>Expandir e contrair na mesma migration</b>: impede deploy sem parada.</li>
+            <li>Também: SET NOT NULL, FK sem NOT VALID, DEFAULT volátil, UPDATE sem WHERE e CONCURRENTLY dentro de transação.</li>
+          </ul>
+          <h3 style="margin-top:22px">Limites</h3>
+          <ul>
+            <li>Cobre DDL de tabela, índice e constraint. Views, funções e triggers são reconhecidos, mas não modelados.</li>
+            <li>Não conhece o volume de dados: o risco é sobre o comando, não sobre a sua tabela.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>Schema Lab · Thiago Moreira · feito com HTML, CSS e JavaScript puro</footer>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+/* =========================================================
+   Exemplo: e-commerce em 6 migrations, com riscos plantados
+   ========================================================= */
+const EXEMPLO = `-- V1__catalogo_e_clientes.sql
+-- Base da loja: categorias, produtos e clientes
+CREATE TABLE categorias (
+  id    SERIAL PRIMARY KEY,
+  nome  VARCHAR(80) NOT NULL UNIQUE
+);
+
+CREATE TABLE produtos (
+  id            BIGSERIAL PRIMARY KEY,
+  sku           VARCHAR(30)  NOT NULL UNIQUE,
+  nome          VARCHAR(120) NOT NULL,
+  categoria_id  INT NOT NULL REFERENCES categorias (id),
+  preco         NUMERIC(10,2) NOT NULL CHECK (preco >= 0),
+  criado_em     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_produtos_categoria ON produtos (categoria_id);
+
+CREATE TABLE clientes (
+  id        BIGSERIAL PRIMARY KEY,
+  email     VARCHAR(150) NOT NULL UNIQUE,
+  nome      VARCHAR(150) NOT NULL,
+  telefone  VARCHAR(20)
+);
+
+-- V2__pedidos.sql
+CREATE TABLE pedidos (
+  id          BIGSERIAL PRIMARY KEY,
+  cliente_id  BIGINT NOT NULL,
+  status      VARCHAR(20) NOT NULL DEFAULT 'ABERTO',
+  total       NUMERIC(12,2),
+  criado_em   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT fk_pedido_cliente FOREIGN KEY (cliente_id) REFERENCES clientes (id)
+);
+CREATE INDEX idx_pedidos_cliente ON pedidos (cliente_id);
+
+CREATE TABLE itens_pedido (
+  id              BIGSERIAL PRIMARY KEY,
+  pedido_id       BIGINT NOT NULL,
+  produto_id      BIGINT NOT NULL,
+  quantidade      INT NOT NULL CHECK (quantidade > 0),
+  preco_unitario  NUMERIC(10,2) NOT NULL,
+  CONSTRAINT fk_item_pedido FOREIGN KEY (pedido_id) REFERENCES pedidos (id),
+  CONSTRAINT uq_item UNIQUE (pedido_id, produto_id)
+);
+ALTER TABLE itens_pedido
+  ADD CONSTRAINT fk_item_produto FOREIGN KEY (produto_id) REFERENCES produtos (id);
+
+CREATE TABLE cupons_legado (
+  id      SERIAL PRIMARY KEY,
+  codigo  VARCHAR(20)
+);
+
+-- V3__pagamentos.sql
+CREATE TABLE pagamentos (
+  id          BIGSERIAL PRIMARY KEY,
+  pedido_id   BIGINT NOT NULL REFERENCES pedidos (id),
+  metodo      VARCHAR(20) NOT NULL,
+  gateway     VARCHAR(40),
+  pago_em     TIMESTAMPTZ NOT NULL,
+  observacao  TEXT
+);
+CREATE INDEX idx_pagamentos_data ON pagamentos (pago_em);
+
+-- V4__estoque.sql
+CREATE TABLE armazens (
+  id    SERIAL PRIMARY KEY,
+  nome  VARCHAR(80) NOT NULL,
+  uf    CHAR(2) NOT NULL
+);
+
+CREATE TABLE estoque (
+  produto_id     BIGINT NOT NULL REFERENCES produtos (id),
+  armazem_id     INT NOT NULL REFERENCES armazens (id),
+  quantidade     INT NOT NULL DEFAULT 0,
+  atualizado_em  TIMESTAMPTZ
+);
+
+ALTER TABLE pedidos ADD COLUMN canal VARCHAR(30) NOT NULL;
+CREATE INDEX idx_pedidos_canal ON pedidos (canal);
+
+-- V5__ajustes_de_tipo.sql
+ALTER TABLE pedidos ALTER COLUMN total TYPE NUMERIC(14,2);
+ALTER TABLE produtos ALTER COLUMN nome TYPE VARCHAR(255);
+ALTER TABLE pagamentos RENAME COLUMN gateway TO gateway_nome;
+ALTER TABLE itens_pedido ADD COLUMN desconto NUMERIC(10,2) DEFAULT 0;
+
+-- V6__limpeza_legado.sql
+DROP TABLE cupons_legado;
+ALTER TABLE pagamentos DROP COLUMN observacao;
+UPDATE pedidos SET canal = 'SITE';
+CREATE INDEX CONCURRENTLY idx_estoque_produto ON estoque (produto_id);
+`;
+
+/* =========================================================
+   1. Tokenizer
+   ========================================================= */
+function tokenize(src) {
+  const toks = [];
+  let i = 0, line = 1;
+  const n = src.length;
+  while (i < n) {
+    const c = src[i];
+    if (c === "\n") { line++; i++; continue; }
+    if (c === " " || c === "\t" || c === "\r" || c === "\f") { i++; continue; }
+    if (c === "-" && src[i + 1] === "-") { while (i < n && src[i] !== "\n") i++; continue; }
+    if (c === "/" && src[i + 1] === "*") {
+      i += 2;
+      while (i < n && !(src[i] === "*" && src[i + 1] === "/")) { if (src[i] === "\n") line++; i++; }
+      i += 2; continue;
+    }
+    const start = i, sl = line;
+    if (c === "'") {
+      i++;
+      while (i < n) {
+        if (src[i] === "'") { if (src[i + 1] === "'") { i += 2; continue; } i++; break; }
+        if (src[i] === "\n") line++;
+        i++;
+      }
+      toks.push({ t: "str", v: src.slice(start, i), line: sl, s: start, e: i }); continue;
+    }
+    if (c === '"') {
+      i++;
+      while (i < n && src[i] !== '"') { if (src[i] === "\n") line++; i++; }
+      i++;
+      toks.push({ t: "id", v: src.slice(start + 1, i - 1), q: true, u: "", line: sl, s: start, e: i }); continue;
+    }
+    if (c === "$") {
+      const m = /^\$([A-Za-z_]\w*)?\$/.exec(src.slice(i, i + 64));
+      if (m) {
+        const tag = m[0];
+        const end = src.indexOf(tag, i + tag.length);
+        const stop = end < 0 ? n : end + tag.length;
+        for (let k = i; k < stop; k++) if (src[k] === "\n") line++;
+        i = stop;
+        toks.push({ t: "str", v: src.slice(start, i), line: sl, s: start, e: i }); continue;
+      }
+    }
+    if (/[A-Za-z_À-ɏ]/.test(c)) {
+      while (i < n && /[\w$À-ɏ]/.test(src[i])) i++;
+      const v = src.slice(start, i);
+      toks.push({ t: "w", v, u: v.toUpperCase(), line: sl, s: start, e: i }); continue;
+    }
+    if (/[0-9]/.test(c)) {
+      while (i < n && /[0-9.eE]/.test(src[i])) i++;
+      toks.push({ t: "num", v: src.slice(start, i), line: sl, s: start, e: i }); continue;
+    }
+    if (c === ":" && src[i + 1] === ":") { i += 2; toks.push({ t: "p", v: "::", line: sl, s: start, e: i }); continue; }
+    i++;
+    toks.push({ t: "p", v: c, line: sl, s: start, e: i });
+  }
+  return toks;
+}
+
+function splitStatements(toks, src) {
+  const out = [];
+  let cur = [];
+  for (const t of toks) {
+    if (t.t === "p" && t.v === ";") {
+      if (cur.length) out.push(mkStmt(cur, src));
+      cur = [];
+    } else cur.push(t);
+  }
+  if (cur.length) out.push(mkStmt(cur, src));
+  return out;
+}
+function mkStmt(toks, src) {
+  return { toks, line: toks[0].line, raw: src.slice(toks[0].s, toks[toks.length - 1].e) };
+}
+
+/* =========================================================
+   2. Parser
+   ========================================================= */
+const COL_STOP = new Set(["NOT", "NULL", "DEFAULT", "PRIMARY", "UNIQUE", "REFERENCES", "CHECK", "CONSTRAINT", "COLLATE", "GENERATED"]);
+const TBL_CONSTRAINT = new Set(["CONSTRAINT", "PRIMARY", "FOREIGN", "UNIQUE", "CHECK", "EXCLUDE"]);
+
+class ParseError extends Error {
+  constructor(msg, tok) { super(msg); this.tok = tok; }
+}
+
+class P {
+  constructor(toks, src) { this.t = toks; this.i = 0; this.src = src; }
+  peek(k = 0) { return this.t[this.i + k]; }
+  done() { return this.i >= this.t.length; }
+  is(...ws) {
+    for (let k = 0; k < ws.length; k++) {
+      const x = this.t[this.i + k];
+      if (!x) return false;
+      const w = ws[k];
+      if (/^[A-Z_]+$/.test(w)) { if (x.t !== "w" || x.u !== w) return false; }
+      else if (x.v !== w || x.t !== "p") return false;
+    }
+    return true;
+  }
+  accept(...ws) { if (this.is(...ws)) { this.i += ws.length; return true; } return false; }
+  expect(w) { if (!this.accept(w)) throw new ParseError(`esperava "${w}" e encontrou "${this.peek() ? this.peek().v : "fim do comando"}"`, this.peek() || this.t[this.t.length - 1]); }
+  ident() {
+    let x = this.t[this.i];
+    if (!x || (x.t !== "w" && x.t !== "id")) throw new ParseError(`esperava um nome e encontrou "${x ? x.v : "fim do comando"}"`, x || this.t[this.t.length - 1]);
+    this.i++;
+    let name = identName(x);
+    while (this.is(".")) {
+      this.i++;
+      const y = this.t[this.i++];
+      if (!y) throw new ParseError("nome incompleto depois do ponto", x);
+      name = identName(y);
+    }
+    return name;
+  }
+  text(a, b) { if (a > b || !this.t[a]) return ""; return this.src.slice(this.t[a].s, this.t[b].e).replace(/\s+/g, " ").trim(); }
+  parenBody() {
+    const open = this.peek();
+    this.expect("(");
+    const start = this.i;
+    let depth = 1;
+    while (!this.done()) {
+      const x = this.peek();
+      if (x.t === "p" && x.v === "(") depth++;
+      if (x.t === "p" && x.v === ")") { depth--; if (depth === 0) break; }
+      this.i++;
+    }
+    if (this.done()) throw new ParseError("parêntese aberto sem fechar", open);
+    const body = this.t.slice(start, this.i);
+    this.i++;
+    return body;
+  }
+  untilStop(stopSet) {
+    const a = this.i;
+    let depth = 0;
+    while (!this.done()) {
+      const x = this.peek();
+      if (x.t === "p" && (x.v === "(" || x.v === "[")) depth++;
+      if (x.t === "p" && (x.v === ")" || x.v === "]")) depth--;
+      if (depth === 0 && x.t === "w" && stopSet.has(x.u)) break;
+      this.i++;
+    }
+    return this.text(a, this.i - 1);
+  }
+}
+function identName(x) { return x.q ? x.v : x.v.toLowerCase(); }
+function splitTop(toks, sep = ",") {
+  const out = [];
+  let cur = [], depth = 0;
+  for (const x of toks) {
+    if (x.t === "p" && x.v === "(") depth++;
+    if (x.t === "p" && x.v === ")") depth--;
+    if (depth === 0 && x.t === "p" && x.v === sep) { if (cur.length) out.push(cur); cur = []; continue; }
+    cur.push(x);
+  }
+  if (cur.length) out.push(cur);
+  return out;
+}
+function identsIn(toks) {
+  return splitTop(toks).map(el => {
+    const f = el[0];
+    return f.t === "w" || f.t === "id" ? identName(f) : el.map(t => t.v).join("");
+  });
+}
+
+function parseStmt(toks, src) {
+  const p = new P(toks, src);
+  if (p.accept("CREATE")) {
+    p.accept("OR", "REPLACE");
+    const unique = p.accept("UNIQUE");
+    if (p.accept("INDEX")) return parseCreateIndex(p, unique);
+    p.accept("TEMPORARY") || p.accept("TEMP");
+    p.accept("UNLOGGED");
+    if (p.accept("TABLE")) return parseCreateTable(p);
+    return other(toks);
+  }
+  if (p.accept("ALTER", "TABLE")) return parseAlterTable(p);
+  if (p.accept("DROP", "TABLE")) {
+    const ie = p.accept("IF", "EXISTS");
+    const names = [p.ident()];
+    while (p.accept(",")) names.push(p.ident());
+    const cascade = p.accept("CASCADE");
+    return { type: "dropTable", names, ie, cascade };
+  }
+  if (p.accept("DROP", "INDEX")) {
+    const conc = p.accept("CONCURRENTLY");
+    const ie = p.accept("IF", "EXISTS");
+    const names = [p.ident()];
+    while (p.accept(",")) names.push(p.ident());
+    return { type: "dropIndex", names, ie, conc };
+  }
+  return other(toks);
+}
+function other(toks) {
+  const verb = toks[0].t === "w" ? toks[0].u : toks[0].v;
+  const words = toks.filter(t => t.t === "w").map(t => t.u);
+  let table = null;
+  if (verb === "UPDATE" && toks[1]) table = identName(toks[1]);
+  if ((verb === "INSERT" || verb === "DELETE") && toks[2]) table = identName(toks[2]);
+  return { type: "other", verb, hasWhere: words.includes("WHERE"), table, kind: words.slice(0, 3).join(" ") };
+}
+
+function parseCreateTable(p) {
+  const ine = p.accept("IF", "NOT", "EXISTS");
+  const name = p.ident();
+  if (!p.is("(")) return { type: "other", verb: "CREATE", kind: "CREATE TABLE AS", hasWhere: false };
+  const body = p.parenBody();
+  const columns = [], constraints = [];
+  for (const el of splitTop(body)) {
+    const sub = new P(el, p.src);
+    const f = el[0];
+    if (f.t === "w" && TBL_CONSTRAINT.has(f.u)) constraints.push(parseTableConstraint(sub));
+    else if (f.t === "w" && f.u === "LIKE") continue;
+    else columns.push(parseColumn(sub));
+  }
+  return { type: "createTable", name, ine, columns, constraints };
+}
+
+function parseColumn(sub) {
+  const col = { name: sub.ident(), type: "", nullable: true, def: null, auto: false, pk: false, unique: false, uniqueName: null, fk: null, checks: [] };
+  col.type = sub.untilStop(COL_STOP).toLowerCase();
+  if (!col.type) throw new ParseError(`coluna "${col.name}" sem tipo`, sub.t[0]);
+  if (/^(small|big)?serial\b|^serial[248]\b/.test(col.type)) { col.auto = true; col.nullable = false; }
+  let cname = null;
+  while (!sub.done()) {
+    if (sub.accept("CONSTRAINT")) { cname = sub.ident(); continue; }
+    if (sub.accept("NOT", "NULL")) col.nullable = false;
+    else if (sub.accept("NULL")) col.nullable = true;
+    else if (sub.accept("DEFAULT")) col.def = sub.untilStop(COL_STOP);
+    else if (sub.accept("PRIMARY", "KEY")) { col.pk = true; col.pkName = cname; col.nullable = false; }
+    else if (sub.accept("UNIQUE")) { col.unique = true; col.uniqueName = cname; }
+    else if (sub.accept("REFERENCES")) {
+      const refTable = sub.ident();
+      const refCols = sub.is("(") ? identsIn(sub.parenBody()) : null;
+      skipFkTail(sub);
+      col.fk = { name: cname, refTable, refCols };
+    }
+    else if (sub.accept("CHECK")) { col.checks.push({ name: cname, expr: sub.text(sub.i, sub.i) }); sub.parenBody(); }
+    else if (sub.accept("COLLATE")) sub.ident();
+    else if (sub.accept("GENERATED")) {
+      sub.accept("ALWAYS") || sub.accept("BY", "DEFAULT");
+      sub.accept("AS");
+      if (sub.accept("IDENTITY")) { col.auto = true; col.nullable = false; if (sub.is("(")) sub.parenBody(); }
+      else if (sub.is("(")) { sub.parenBody(); sub.accept("STORED"); col.generated = true; }
+    }
+    else sub.i++;
+    if (!sub.is("CONSTRAINT")) cname = null;
+  }
+  return col;
+}
+function skipFkTail(sub) {
+  for (;;) {
+    if (sub.accept("ON")) {
+      sub.accept("DELETE") || sub.accept("UPDATE");
+      if (sub.accept("SET")) { sub.accept("NULL") || sub.accept("DEFAULT"); }
+      else if (sub.accept("NO")) sub.accept("ACTION");
+      else sub.i++;
+      continue;
+    }
+    if (sub.accept("MATCH")) { sub.i++; continue; }
+    if (sub.accept("NOT", "DEFERRABLE") || sub.accept("DEFERRABLE")) continue;
+    if (sub.accept("INITIALLY")) { sub.i++; continue; }
+    break;
+  }
+}
+function parseTableConstraint(sub) {
+  const name = sub.accept("CONSTRAINT") ? sub.ident() : null;
+  let c;
+  if (sub.accept("PRIMARY", "KEY")) c = { kind: "pk", name, cols: identsIn(sub.parenBody()) };
+  else if (sub.accept("UNIQUE")) { sub.accept("NULLS", "NOT", "DISTINCT"); c = { kind: "unique", name, cols: identsIn(sub.parenBody()) }; }
+  else if (sub.accept("FOREIGN", "KEY")) {
+    const cols = identsIn(sub.parenBody());
+    sub.expect("REFERENCES");
+    const refTable = sub.ident();
+    const refCols = sub.is("(") ? identsIn(sub.parenBody()) : null;
+    skipFkTail(sub);
+    c = { kind: "fk", name, cols, refTable, refCols };
+  }
+  else if (sub.accept("CHECK")) { const b = sub.parenBody(); c = { kind: "check", name, expr: b.length ? sub.src.slice(b[0].s, b[b.length - 1].e).replace(/\s+/g, " ") : "" }; }
+  else if (sub.accept("EXCLUDE")) { c = { kind: "exclude", name }; sub.i = sub.t.length; }
+  else throw new ParseError("constraint não reconhecida", sub.peek() || sub.t[0]);
+  for (let k = sub.i; k < sub.t.length - 1; k++) if (sub.t[k].u === "NOT" && sub.t[k + 1].u === "VALID") c.notValid = true;
+  return c;
+}
+
+function parseAlterTable(p) {
+  const ie = p.accept("IF", "EXISTS");
+  p.accept("ONLY");
+  const name = p.ident();
+  const rest = p.t.slice(p.i);
+  if (!rest.length) throw new ParseError("ALTER TABLE sem ação", p.t[p.t.length - 1]);
+  const actions = splitTop(rest).map(el => parseAlterAction(new P(el, p.src)));
+  return { type: "alterTable", name, ie, actions };
+}
+function parseAlterAction(sub) {
+  const line = sub.t[0].line;
+  if (sub.accept("ADD")) {
+    const f = sub.peek();
+    if (f && f.t === "w" && TBL_CONSTRAINT.has(f.u)) return { op: "addConstraint", c: parseTableConstraint(sub), line };
+    sub.accept("COLUMN");
+    const ine = sub.accept("IF", "NOT", "EXISTS");
+    return { op: "addColumn", col: parseColumn(sub), ine, line };
+  }
+  if (sub.accept("DROP")) {
+    if (sub.accept("CONSTRAINT")) { const ie = sub.accept("IF", "EXISTS"); return { op: "dropConstraint", name: sub.ident(), ie, line }; }
+    sub.accept("COLUMN");
+    const ie = sub.accept("IF", "EXISTS");
+    const name = sub.ident();
+    return { op: "dropColumn", name, ie, cascade: sub.accept("CASCADE"), line };
+  }
+  if (sub.accept("ALTER")) {
+    sub.accept("COLUMN");
+    const col = sub.ident();
+    if (sub.accept("TYPE") || sub.accept("SET", "DATA", "TYPE")) {
+      const type = sub.untilStop(new Set(["USING", "COLLATE"])).toLowerCase();
+      let using = null;
+      if (sub.accept("USING")) using = sub.text(sub.i, sub.t.length - 1);
+      return { op: "alterType", col, type, using, line };
+    }
+    if (sub.accept("SET", "NOT", "NULL")) return { op: "setNotNull", col, line };
+    if (sub.accept("DROP", "NOT", "NULL")) return { op: "dropNotNull", col, line };
+    if (sub.accept("SET", "DEFAULT")) return { op: "setDefault", col, expr: sub.text(sub.i, sub.t.length - 1), line };
+    if (sub.accept("DROP", "DEFAULT")) return { op: "dropDefault", col, line };
+    return { op: "otherAlter", text: sub.text(0, sub.t.length - 1), line };
+  }
+  if (sub.accept("RENAME")) {
+    if (sub.accept("TO")) return { op: "renameTable", to: sub.ident(), line };
+    if (sub.accept("CONSTRAINT")) { const from = sub.ident(); sub.expect("TO"); return { op: "renameConstraint", from, to: sub.ident(), line }; }
+    sub.accept("COLUMN");
+    const from = sub.ident();
+    sub.expect("TO");
+    return { op: "renameColumn", from, to: sub.ident(), line };
+  }
+  if (sub.accept("VALIDATE", "CONSTRAINT")) return { op: "validateConstraint", name: sub.ident(), line };
+  return { op: "otherAlter", text: sub.text(0, sub.t.length - 1), line };
+}
+
+function parseCreateIndex(p, unique) {
+  const conc = p.accept("CONCURRENTLY");
+  const ine = p.accept("IF", "NOT", "EXISTS");
+  let name = null;
+  if (!p.is("ON")) name = p.ident();
+  p.expect("ON");
+  p.accept("ONLY");
+  const table = p.ident();
+  if (p.accept("USING")) p.ident();
+  const els = splitTop(p.parenBody());
+  const cols = els.map(el => {
+    const simple = (el[0].t === "w" || el[0].t === "id") && (el.length === 1 || (el[1].t === "w" && ["ASC", "DESC", "NULLS", "COLLATE"].includes(el[1].u)));
+    return simple ? identName(el[0]) : "(" + p.src.slice(el[0].s, el[el.length - 1].e).replace(/\s+/g, " ") + ")";
+  });
+  let where = null;
+  if (p.accept("WHERE")) where = p.text(p.i, p.t.length - 1);
+  if (!name) name = (table + "_" + cols.join("_") + "_idx").replace(/[^\w]/g, "").toLowerCase();
+  return { type: "createIndex", name, table, cols, unique, conc, ine, where };
+}
+
+/* =========================================================
+   3. Modelo + 4. Regras
+   ========================================================= */
+const clone = o => JSON.parse(JSON.stringify(o));
+const SEV = ["erro", "crit", "alto", "medio", "baixo", "info"];
+const SEV_LABEL = { erro: "erro", crit: "crítico", alto: "alto", medio: "médio", baixo: "baixo", info: "info" };
+
+function compareVersion(a, b) {
+  const pa = a.split(/[._]/).map(Number), pb = b.split(/[._]/).map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0);
+    if (d) return d;
+  }
+  return 0;
+}
+
+function splitMigrations(text) {
+  const lines = text.split("\n");
+  const head = /^\s*--\s*V(\d+(?:[._]\d+)*)__([^\s]+?)(?:\.sql)?\s*$/i;
+  const migs = [];
+  let cur = null;
+  const pre = [];
+  lines.forEach((ln, idx) => {
+    const m = head.exec(ln);
+    if (m) {
+      cur = { num: m[1], version: "V" + m[1], name: m[2], line: idx + 1, bodyLine: idx + 2, sqlLines: [] };
+      migs.push(cur);
+    } else if (cur) cur.sqlLines.push(ln);
+    else pre.push(ln);
+  });
+  if (pre.some(l => l.trim() && !/^\s*--/.test(l))) {
+    migs.unshift({ num: "0", version: "V0", name: "sem_cabecalho", line: 1, bodyLine: 1, sqlLines: pre, implicit: true });
+  }
+  migs.forEach(m => { m.sql = m.sqlLines.join("\n"); delete m.sqlLines; });
+  const dup = new Set(), seen = new Set();
+  migs.forEach(m => { if (seen.has(m.num)) dup.add(m.num); seen.add(m.num); });
+  migs.sort((a, b) => compareVersion(a.num, b.num));
+  migs.forEach(m => { if (dup.has(m.num)) m.duplicate = true; });
+  return migs;
+}
+
+function emptyModel() { return { tables: {}, indexes: {} }; }
+
+function fkName(t, cols) { return `${t}_${cols.join("_")}_fkey`; }
+
+function colSQL(c) {
+  return `${c.name} ${c.type}${(!c.nullable && !c.auto) ? " NOT NULL" : ""}${c.def ? " DEFAULT " + c.def : ""}`;
+}
+function constraintSQL(t, c) {
+  if (c.kind === "pk") return `CONSTRAINT ${c.name} PRIMARY KEY (${c.cols.join(", ")})`;
+  if (c.kind === "unique") return `CONSTRAINT ${c.name} UNIQUE (${c.cols.join(", ")})`;
+  if (c.kind === "fk") return `CONSTRAINT ${c.name} FOREIGN KEY (${c.cols.join(", ")}) REFERENCES ${c.refTable}${c.refCols ? " (" + c.refCols.join(", ") + ")" : ""}`;
+  if (c.kind === "check") return `CONSTRAINT ${c.name} CHECK (${c.expr})`;
+  return `-- constraint ${c.name}`;
+}
+function tableConstraints(t) {
+  const out = [];
+  if (t.pk.length) out.push({ kind: "pk", name: t.pkName || `${t.name}_pkey`, cols: t.pk });
+  t.uniques.forEach(u => out.push({ kind: "unique", ...u }));
+  t.fks.forEach(f => out.push({ kind: "fk", ...f }));
+  t.checks.forEach(c => out.push({ kind: "check", ...c }));
+  return out;
+}
+function createTableSQL(t) {
+  const parts = t.cols.map(c => "  " + colSQL(c)).concat(tableConstraints(t).map(c => "  " + constraintSQL(t, c)));
+  return `CREATE TABLE ${t.name} (\n${parts.join(",\n")}\n);`;
+}
+function indexSQL(ix, conc) {
+  return `CREATE ${ix.unique ? "UNIQUE " : ""}INDEX ${conc ? "CONCURRENTLY " : ""}${ix.name} ON ${ix.table} (${ix.cols.join(", ")});`;
+}
+
+function isCheapTypeChange(oldT, newT) {
+  const o = /^(?:character varying|varchar)\s*\((\d+)\)$/.exec(oldT || "");
+  const n = /^(?:character varying|varchar)\s*\((\d+)\)$/.exec(newT);
+  if (o && n) return Number(n[1]) >= Number(o[1]);
+  if (o && /^text$/.test(newT)) return true;
+  if (/^(?:character varying|varchar)$/.test(newT) && o) return true;
+  return false;
+}
+
+function fkCovered(model, t, fk) {
+  const k = fk.cols.length;
+  const lists = [];
+  if (t.pk.length) lists.push(t.pk);
+  t.uniques.forEach(u => lists.push(u.cols));
+  Object.values(model.indexes).forEach(ix => { if (ix.table === t.name) lists.push(ix.cols); });
+  const want = new Set(fk.cols);
+  return lists.some(L => L.length >= k && L.slice(0, k).every(c => want.has(c)));
+}
+
+function referencesTo(model, tableName, exceptSelf = true) {
+  const out = [];
+  Object.values(model.tables).forEach(t => {
+    if (exceptSelf && t.name === tableName) return;
+    t.fks.forEach(f => { if (f.refTable === tableName) out.push({ table: t, fk: f }); });
+  });
+  return out;
+}
+
+function applyStmt(ast, model, ctx) {
+  const ver = ctx.ver;
+  const R = (sev, rule, title, detail, fix, extra) => ctx.risks.push({ sev, rule, title, detail, fix, version: ver, mig: ctx.label, line: ctx.line, ...(extra || {}) });
+  const existed = name => !!ctx.before.tables[name];
+
+  if (ast.type === "createTable") {
+    ctx.touched.add(ast.name);
+    if (model.tables[ast.name]) {
+      if (ast.ine) { R("info", "ja-existe", `Tabela ${ast.name} já existe`, "Com IF NOT EXISTS o comando é ignorado.", null); return; }
+      R("erro", "erro", `Tabela ${ast.name} já existe`, "O PostgreSQL recusaria este CREATE TABLE.", "Use outro nome ou IF NOT EXISTS.");
+      return;
+    }
+    const t = { name: ast.name, cols: [], pk: [], pkName: null, fks: [], uniques: [], checks: [], origin: ver };
+    for (const c of ast.columns) {
+      if (t.cols.some(x => x.name === c.name)) { R("erro", "erro", `Coluna ${c.name} repetida em ${ast.name}`, "Duas colunas com o mesmo nome.", null); continue; }
+      t.cols.push({ name: c.name, type: c.type, nullable: c.nullable, def: c.def, auto: c.auto, origin: ver });
+      if (c.pk) { t.pk = [c.name]; t.pkName = c.pkName || `${ast.name}_pkey`; }
+      if (c.unique) t.uniques.push({ name: c.uniqueName || `${ast.name}_${c.name}_key`, cols: [c.name] });
+      if (c.fk) t.fks.push({ name: c.fk.name || fkName(ast.name, [c.name]), cols: [c.name], refTable: c.fk.refTable, refCols: c.fk.refCols, origin: ver });
+      c.checks.forEach((ch, i) => t.checks.push({ name: ch.name || `${ast.name}_${c.name}_check`, expr: "…" }));
+    }
+    model.tables[ast.name] = t;
+    for (const c of ast.constraints) addConstraint(t, c, model, ctx, R, false);
+    t.fks.forEach(f => checkFkTarget(model, t, f, R));
+    ctx.undo.push(`DROP TABLE ${ast.name};`);
+    ctx.expand.push("CREATE TABLE");
+    return;
+  }
+
+  if (ast.type === "alterTable") {
+    let t = model.tables[ast.name];
+    if (!t) {
+      if (ast.ie) { R("info", "nao-existe", `Tabela ${ast.name} não existe`, "Com IF EXISTS o comando é ignorado.", null); return; }
+      R("erro", "erro", `Tabela ${ast.name} não existe`, "ALTER TABLE em tabela que nenhuma migration anterior criou.", "Confira o nome ou a ordem das migrations.");
+      return;
+    }
+    ctx.touched.add(t.name);
+    const undo = [];
+    for (const a of ast.actions) {
+      const tn = t.name;
+      const wasThere = existed(tn);
+      if (a.op === "addColumn") {
+        const c = a.col;
+        if (t.cols.some(x => x.name === c.name)) {
+          if (!a.ine) R("erro", "erro", `Coluna ${tn}.${c.name} já existe`, "O PostgreSQL recusaria este ADD COLUMN.", null);
+          continue;
+        }
+        if (wasThere && !c.nullable && !c.def && !c.auto) {
+          R("alto", "not-null-sem-default", `NOT NULL sem DEFAULT em ${tn}.${c.name}`, `A tabela ${tn} já existe. Se tiver qualquer linha, o ADD COLUMN falha e a migration para no meio do deploy.`, "Adicione a coluna como NULL, preencha os dados em lotes e só depois rode SET NOT NULL. Ou dê um DEFAULT constante.");
+        }
+        if (wasThere && c.def && /\b(random|clock_timestamp|gen_random_uuid|uuid_generate_v[14]|timeofday)\s*\(/i.test(c.def)) {
+          R("medio", "default-volatil", `DEFAULT volátil em ${tn}.${c.name}`, `${c.def} é recalculado por linha: o PostgreSQL reescreve a tabela inteira com lock exclusivo.`, "Crie a coluna sem DEFAULT, preencha em lotes e defina o DEFAULT depois.");
+        }
+        t.cols.push({ name: c.name, type: c.type, nullable: c.nullable, def: c.def, auto: c.auto, origin: ver });
+        if (c.pk) { t.pk = [c.name]; t.pkName = `${tn}_pkey`; }
+        if (c.unique) t.uniques.push({ name: c.uniqueName || `${tn}_${c.name}_key`, cols: [c.name] });
+        if (c.fk) { const f = { name: c.fk.name || fkName(tn, [c.name]), cols: [c.name], refTable: c.fk.refTable, refCols: c.fk.refCols, origin: ver }; t.fks.push(f); checkFkTarget(model, t, f, R); }
+        undo.push(`ALTER TABLE ${tn} DROP COLUMN ${c.name};`);
+        ctx.expand.push("ADD COLUMN");
+      }
+      else if (a.op === "addConstraint") {
+        const c = a.c;
+        if (wasThere && c.kind === "fk" && !c.notValid) {
+          R("medio", "fk-valida", `FK em tabela existente valida todas as linhas`, `${tn} já existe: adicionar a FK sem NOT VALID varre a tabela inteira e trava escrita nas duas tabelas.`, "Adicione com NOT VALID e rode VALIDATE CONSTRAINT numa migration separada.");
+        }
+        if (wasThere && (c.kind === "pk" || c.kind === "unique")) {
+          R("medio", "pk-unique-lock", `${c.kind === "pk" ? "PRIMARY KEY" : "UNIQUE"} em tabela existente`, "Cria o índice com lock exclusivo enquanto lê a tabela inteira.", "Crie antes um UNIQUE INDEX CONCURRENTLY e use ADD CONSTRAINT ... USING INDEX.");
+        }
+        const name = addConstraint(t, c, model, ctx, R, true);
+        if (name) undo.push(`ALTER TABLE ${tn} DROP CONSTRAINT ${name};`);
+        ctx.expand.push("ADD CONSTRAINT");
+      }
+      else if (a.op === "dropColumn") {
+        const col = t.cols.find(x => x.name === a.name);
+        if (!col) { if (!a.ie) R("erro", "erro", `Coluna ${tn}.${a.name} não existe`, "DROP COLUMN de coluna inexistente.", null); continue; }
+        R("crit", "drop-column", `DROP COLUMN apaga ${tn}.${a.name}`, "Os dados da coluna somem e o rollback não traz os valores de volta.", "Primeiro pare de ler e escrever a coluna no código, faça backup dela e só remova numa migration posterior (contrair).");
+        const refs = referencesTo(model, tn, false).filter(r => (r.fk.refCols || t.pk).includes(a.name));
+        if (refs.length && !a.cascade) R("alto", "drop-referenciada", `${tn}.${a.name} é referenciada por FK`, `Referenciada por ${refs.map(r => r.table.name).join(", ")}. Sem CASCADE o PostgreSQL recusa.`, "Remova a FK antes, de forma explícita.");
+        undo.push(`-- os valores de ${tn}.${a.name} não voltam: restaure do backup\nALTER TABLE ${tn} ADD COLUMN ${colSQL({ ...col, nullable: true })};`);
+        removeColumn(model, t, a.name);
+        refs.forEach(r => { r.table.fks = r.table.fks.filter(f => f !== r.fk); });
+        ctx.contract.push("DROP COLUMN");
+      }
+      else if (a.op === "dropConstraint") {
+        const found = tableConstraints(t).find(c => c.name === a.name);
+        if (!found) { if (!a.ie) R("erro", "erro", `Constraint ${a.name} não existe em ${tn}`, "O nome não bate com nenhuma constraint conhecida.", "Confira o nome real no banco (\\d " + tn + ")."); continue; }
+        if (found.kind === "pk") { t.pk = []; t.pkName = null; }
+        t.uniques = t.uniques.filter(u => u.name !== a.name);
+        t.fks = t.fks.filter(f => f.name !== a.name);
+        t.checks = t.checks.filter(c => c.name !== a.name);
+        undo.push(`ALTER TABLE ${tn} ADD ${constraintSQL(t, found)};`);
+        ctx.contract.push("DROP CONSTRAINT");
+      }
+      else if (a.op === "alterType") {
+        const col = t.cols.find(x => x.name === a.col);
+        if (!col) { R("erro", "erro", `Coluna ${tn}.${a.col} não existe`, "ALTER COLUMN TYPE em coluna inexistente.", null); continue; }
+        if (isCheapTypeChange(col.type, a.type)) {
+          R("baixo", "alter-type", `Tipo de ${tn}.${a.col}: ${col.type} → ${a.type}`, "Aumentar o tamanho de varchar não reescreve a tabela no PostgreSQL. Só altera o catálogo.", null);
+        } else {
+          R("alto", "alter-type", `ALTER TYPE reescreve ${tn}`, `${tn}.${a.col} passa de ${col.type} para ${a.type}. O PostgreSQL reescreve a tabela e os índices com ACCESS EXCLUSIVE: ninguém lê nem escreve até terminar.`, "Em tabela grande, crie uma coluna nova, copie em lotes, troque o código e remova a antiga depois.");
+        }
+        undo.push(`ALTER TABLE ${tn} ALTER COLUMN ${a.col} TYPE ${col.type};`);
+        col.type = a.type;
+        col.changedIn = ver;
+        ctx.contract.push("ALTER TYPE");
+      }
+      else if (a.op === "setNotNull" || a.op === "dropNotNull") {
+        const col = t.cols.find(x => x.name === a.col);
+        if (!col) { R("erro", "erro", `Coluna ${tn}.${a.col} não existe`, "Coluna inexistente.", null); continue; }
+        if (a.op === "setNotNull") {
+          if (wasThere && col.nullable) R("medio", "set-not-null", `SET NOT NULL em ${tn}.${a.col}`, "O PostgreSQL varre a tabela inteira com lock exclusivo para conferir que não há nulos.", "Crie antes CHECK (coluna IS NOT NULL) NOT VALID, valide em outra migration e então rode SET NOT NULL.");
+          undo.push(`ALTER TABLE ${tn} ALTER COLUMN ${a.col} DROP NOT NULL;`);
+          col.nullable = false;
+          ctx.contract.push("SET NOT NULL");
+        } else {
+          undo.push(`ALTER TABLE ${tn} ALTER COLUMN ${a.col} SET NOT NULL;`);
+          col.nullable = true;
+          ctx.expand.push("DROP NOT NULL");
+        }
+      }
+      else if (a.op === "setDefault" || a.op === "dropDefault") {
+        const col = t.cols.find(x => x.name === a.col);
+        if (!col) { R("erro", "erro", `Coluna ${tn}.${a.col} não existe`, "Coluna inexistente.", null); continue; }
+        undo.push(col.def ? `ALTER TABLE ${tn} ALTER COLUMN ${a.col} SET DEFAULT ${col.def};` : `ALTER TABLE ${tn} ALTER COLUMN ${a.col} DROP DEFAULT;`);
+        col.def = a.op === "setDefault" ? a.expr : null;
+      }
+      else if (a.op === "renameColumn") {
+        const col = t.cols.find(x => x.name === a.from);
+        if (!col) { R("erro", "erro", `Coluna ${tn}.${a.from} não existe`, "RENAME de coluna inexistente.", null); continue; }
+        R("alto", "rename", `RENAME COLUMN ${tn}.${a.from} → ${a.to}`, "Todo código, view, relatório e query que ainda usa o nome antigo quebra no instante do deploy.", "Expandir e contrair: crie a coluna nova, escreva nas duas, migre a leitura e só então remova a antiga.");
+        renameColumn(model, t, a.from, a.to);
+        undo.push(`ALTER TABLE ${tn} RENAME COLUMN ${a.to} TO ${a.from};`);
+        ctx.contract.push("RENAME");
+      }
+      else if (a.op === "renameTable") {
+        if (model.tables[a.to]) { R("erro", "erro", `Já existe a tabela ${a.to}`, "RENAME para um nome em uso.", null); continue; }
+        R("alto", "rename", `RENAME TABLE ${tn} → ${a.to}`, "Toda query, ORM e permissão que aponta para o nome antigo quebra no deploy.", "Crie uma view com o nome antigo durante a transição, ou faça a troca em etapas.");
+        renameTable(model, tn, a.to);
+        t = model.tables[a.to];
+        ctx.touched.add(a.to);
+        undo.push(`ALTER TABLE ${a.to} RENAME TO ${tn};`);
+        ctx.contract.push("RENAME");
+      }
+      else if (a.op === "renameConstraint") {
+        tableConstraints(t);
+        [t.uniques, t.fks, t.checks].forEach(L => L.forEach(c => { if (c.name === a.from) c.name = a.to; }));
+        if (t.pkName === a.from) t.pkName = a.to;
+        undo.push(`ALTER TABLE ${tn} RENAME CONSTRAINT ${a.to} TO ${a.from};`);
+      }
+      else if (a.op === "validateConstraint") {
+        t.fks.forEach(f => { if (f.name === a.name) f.notValid = false; });
+        undo.push(`-- VALIDATE CONSTRAINT ${a.name} não precisa ser desfeito`);
+      }
+      else {
+        R("info", "nao-modelado", `ALTER TABLE não modelado`, a.text, null);
+        undo.push(`-- revisar manualmente: ALTER TABLE ${tn} ${a.text}`);
+      }
+    }
+    ctx.undo.push(...undo.reverse());
+    return;
+  }
+
+  if (ast.type === "createIndex") {
+    const t = model.tables[ast.table];
+    if (!t) { R("erro", "erro", `Índice em tabela inexistente: ${ast.table}`, "CREATE INDEX aponta para uma tabela que não existe neste ponto.", null); return; }
+    ctx.touched.add(t.name);
+    if (model.indexes[ast.name]) {
+      if (!ast.ine) R("erro", "erro", `Índice ${ast.name} já existe`, "O PostgreSQL recusaria este CREATE INDEX.", null);
+      return;
+    }
+    const missing = ast.cols.filter(c => !c.startsWith("(") && !t.cols.some(x => x.name === c));
+    if (missing.length) R("erro", "erro", `Coluna inexistente no índice ${ast.name}`, `${missing.join(", ")} não existe em ${t.name}.`, null);
+    if (!ast.conc && existed(t.name)) {
+      R("medio", "index-sem-concurrently", `CREATE INDEX sem CONCURRENTLY em ${t.name}`, "A tabela já existe: o índice bloqueia INSERT, UPDATE e DELETE até terminar de ser criado.", `Use CREATE INDEX CONCURRENTLY ${ast.name} ... numa migration só para ele.`);
+    }
+    if (ast.conc) ctx.concurrent = true;
+    model.indexes[ast.name] = { name: ast.name, table: t.name, cols: ast.cols, unique: ast.unique, origin: ver };
+    ctx.undo.push(`DROP INDEX ${ast.conc ? "CONCURRENTLY " : ""}${ast.name};`);
+    ctx.expand.push("CREATE INDEX");
+    return;
+  }
+
+  if (ast.type === "dropIndex") {
+    for (const name of ast.names) {
+      const ix = model.indexes[name];
+      if (!ix) { if (!ast.ie) R("erro", "erro", `Índice ${name} não existe`, "DROP INDEX de índice inexistente.", null); continue; }
+      ctx.touched.add(ix.table);
+      delete model.indexes[name];
+      ctx.undo.push(indexSQL(ix, ast.conc));
+      ctx.contract.push("DROP INDEX");
+    }
+    return;
+  }
+
+  if (ast.type === "dropTable") {
+    const undo = [];
+    for (const name of ast.names) {
+      const t = model.tables[name];
+      if (!t) { if (!ast.ie) R("erro", "erro", `Tabela ${name} não existe`, "DROP TABLE de tabela inexistente.", null); continue; }
+      R("crit", "drop-table", `DROP TABLE apaga ${name}`, "A tabela e todos os dados somem. O rollback recria a estrutura, mas as linhas só voltam com backup.", "Renomeie para _deprecated, observe por um ciclo de deploy e só depois apague, com backup conferido.");
+      const refs = referencesTo(model, name);
+      if (refs.length && !ast.cascade) R("alto", "drop-referenciada", `${name} ainda é referenciada`, `FKs em ${refs.map(r => r.table.name).join(", ")} apontam para ela. Sem CASCADE o PostgreSQL recusa.`, "Remova as FKs antes, de forma explícita.");
+      if (ast.cascade) refs.forEach(r => { r.table.fks = r.table.fks.filter(f => f !== r.fk); });
+      const ixs = Object.values(model.indexes).filter(ix => ix.table === name);
+      undo.push(`-- os dados de ${name} não voltam: restaure do backup\n${createTableSQL(t)}${ixs.length ? "\n" + ixs.map(ix => indexSQL(ix, false)).join("\n") : ""}`);
+      ixs.forEach(ix => delete model.indexes[ix.name]);
+      delete model.tables[name];
+      ctx.contract.push("DROP TABLE");
+    }
+    ctx.undo.push(...undo.reverse());
+    return;
+  }
+
+  // other
+  if (ast.table) ctx.touched.add(ast.table);
+  if ((ast.verb === "UPDATE" || ast.verb === "DELETE") && !ast.hasWhere) {
+    R("alto", "dml-sem-where", `${ast.verb} sem WHERE${ast.table ? " em " + ast.table : ""}`, "Atinge a tabela inteira numa única transação: segura lock em todas as linhas e gera muito WAL.", "Atualize em lotes por faixa de id, fora da migration de schema.");
+  } else if (["UPDATE", "DELETE", "INSERT"].includes(ast.verb)) {
+    R("info", "dml", `${ast.verb} dentro da migration`, "Carga ou correção de dados junto com DDL. Confira o volume antes.", null);
+  } else {
+    R("info", "nao-modelado", `Comando não modelado: ${ast.kind}`, "Reconhecido, mas não altera o diagrama.", null);
+  }
+  ctx.undo.push(`-- revisar manualmente: ${ast.raw.split("\n")[0].slice(0, 90)}`);
+}
+
+function addConstraint(t, c, model, ctx, R, inAlter) {
+  const colsMissing = (c.cols || []).filter(x => !t.cols.some(y => y.name === x));
+  if (colsMissing.length) R("erro", "erro", `Constraint usa coluna inexistente`, `${colsMissing.join(", ")} não existe em ${t.name}.`, null);
+  if (c.kind === "pk") {
+    if (t.pk.length) R("erro", "erro", `${t.name} já tem PRIMARY KEY`, "Uma tabela só pode ter uma PK.", null);
+    t.pk = c.cols; t.pkName = c.name || `${t.name}_pkey`;
+    t.cols.forEach(x => { if (c.cols.includes(x.name)) x.nullable = false; });
+    return t.pkName;
+  }
+  if (c.kind === "unique") { const name = c.name || `${t.name}_${c.cols.join("_")}_key`; t.uniques.push({ name, cols: c.cols }); return name; }
+  if (c.kind === "fk") {
+    const f = { name: c.name || fkName(t.name, c.cols), cols: c.cols, refTable: c.refTable, refCols: c.refCols, origin: ctx.ver, notValid: !!c.notValid };
+    t.fks.push(f);
+    if (inAlter) checkFkTarget(model, t, f, R);
+    return f.name;
+  }
+  if (c.kind === "check") { const name = c.name || `${t.name}_check${t.checks.length ? t.checks.length + 1 : ""}`; t.checks.push({ name, expr: c.expr }); return name; }
+  return c.name;
+}
+function checkFkTarget(model, t, f, R) {
+  const target = model.tables[f.refTable];
+  if (!target) { R("erro", "erro", `FK aponta para tabela inexistente: ${f.refTable}`, `${t.name}.${f.cols.join(", ")} referencia ${f.refTable}, que não existe neste ponto.`, "Confira a ordem das migrations."); return; }
+  const refCols = f.refCols || target.pk;
+  if (!refCols.length) R("erro", "erro", `${f.refTable} não tem PK para a FK usar`, "REFERENCES sem coluna exige PK na tabela de destino.", null);
+}
+function removeColumn(model, t, name) {
+  t.cols = t.cols.filter(c => c.name !== name);
+  if (t.pk.includes(name)) { t.pk = []; t.pkName = null; }
+  t.uniques = t.uniques.filter(u => !u.cols.includes(name));
+  t.fks = t.fks.filter(f => !f.cols.includes(name));
+  Object.values(model.indexes).forEach(ix => { if (ix.table === t.name && ix.cols.includes(name)) delete model.indexes[ix.name]; });
+}
+function renameColumn(model, t, from, to) {
+  t.cols.forEach(c => { if (c.name === from) c.name = to; });
+  const sw = L => L.map(c => c === from ? to : c);
+  t.pk = sw(t.pk);
+  t.uniques.forEach(u => u.cols = sw(u.cols));
+  t.fks.forEach(f => f.cols = sw(f.cols));
+  Object.values(model.indexes).forEach(ix => { if (ix.table === t.name) ix.cols = sw(ix.cols); });
+  Object.values(model.tables).forEach(o => o.fks.forEach(f => { if (f.refTable === t.name && f.refCols) f.refCols = sw(f.refCols); }));
+}
+function renameTable(model, from, to) {
+  const t = model.tables[from];
+  delete model.tables[from];
+  t.name = to;
+  model.tables[to] = t;
+  Object.values(model.tables).forEach(o => o.fks.forEach(f => { if (f.refTable === from) f.refTable = to; }));
+  Object.values(model.indexes).forEach(ix => { if (ix.table === from) ix.table = to; });
+}
+
+function diffModels(a, b) {
+  const d = { addedTables: [], removedTables: [], addedCols: {}, changedCols: {}, removedCols: [] };
+  Object.keys(b.tables).forEach(n => { if (!a.tables[n]) d.addedTables.push(n); });
+  Object.keys(a.tables).forEach(n => { if (!b.tables[n]) d.removedTables.push(n); });
+  Object.values(b.tables).forEach(t => {
+    const old = a.tables[t.name];
+    if (!old) return;
+    t.cols.forEach(c => {
+      const o = old.cols.find(x => x.name === c.name);
+      if (!o) (d.addedCols[t.name] = d.addedCols[t.name] || []).push(c.name);
+      else if (o.type !== c.type) (d.changedCols[t.name] = d.changedCols[t.name] || []).push(c.name);
+    });
+    old.cols.forEach(c => { if (!t.cols.some(x => x.name === c.name)) d.removedCols.push(`${t.name}.${c.name}`); });
+  });
+  return d;
+}
+
+function analyze(text) {
+  const migs = splitMigrations(text);
+  const model = emptyModel();
+  const fkRisks = [];
+  for (const m of migs) {
+    const before = clone(model);
+    m.label = `${m.version}__${m.name}`;
+    const ctx = { ver: m.version, label: m.label, before, risks: [], undo: [], expand: [], contract: [], concurrent: false, touched: new Set(), line: m.line };
+    if (m.duplicate) ctx.risks.push({ sev: "erro", rule: "erro", title: `Versão ${m.version} repetida`, detail: "O Flyway recusa duas migrations com a mesma versão.", fix: "Renumere uma delas.", version: m.version, mig: m.label, line: m.line });
+    if (m.implicit) ctx.risks.push({ sev: "info", rule: "sem-cabecalho", title: "SQL sem cabeçalho de versão", detail: "Tratado como V0. Use linhas como -- V1__criar_tabelas.sql para separar as migrations.", fix: null, version: m.version, mig: m.label, line: 1 });
+    let toks = [];
+    try { toks = tokenize(m.sql); } catch (e) { ctx.risks.push({ sev: "erro", rule: "erro", title: "Falha ao ler o SQL", detail: String(e.message), version: m.version, mig: m.label, line: m.line }); }
+    const stmts = splitStatements(toks, m.sql);
+    m.stmts = [];
+    for (const s of stmts) {
+      ctx.line = m.bodyLine + s.line - 1;
+      let ast;
+      try { ast = parseStmt(s.toks, m.sql); }
+      catch (e) {
+        const tl = e.tok ? m.bodyLine + e.tok.line - 1 : ctx.line;
+        ctx.risks.push({ sev: "erro", rule: "erro", title: "Erro de sintaxe", detail: e.message, fix: null, version: m.version, mig: m.label, line: tl });
+        continue;
+      }
+      ast.raw = s.raw; ast.line = ctx.line;
+      m.stmts.push(ast);
+      try { applyStmt(ast, model, ctx); }
+      catch (e) { ctx.risks.push({ sev: "erro", rule: "erro", title: "Erro ao aplicar comando", detail: e.message, version: m.version, mig: m.label, line: ctx.line }); }
+    }
+    // checagens de fim de migration
+    ctx.line = m.line;
+    Object.values(model.tables).forEach(t => {
+      if (t.origin === m.version && !t.pk.length) ctx.risks.push({ sev: "medio", rule: "sem-pk", title: `Tabela ${t.name} sem PRIMARY KEY`, detail: "Sem PK não há como identificar uma linha com segurança: replicação lógica, ORMs e deduplicação sofrem.", fix: "Adicione uma PK, nem que seja composta pelas colunas que identificam a linha.", version: m.version, mig: m.label, line: m.line });
+      t.fks.forEach(f => {
+        if (f.origin !== m.version || fkCovered(model, t, f)) return;
+        const r = { sev: "medio", rule: "fk-sem-indice", title: `FK sem índice: ${t.name}.${f.cols.join(", ")}`, detail: `Cada DELETE ou UPDATE em ${f.refTable} vai varrer ${t.name} inteira para conferir a FK, e o JOIN pelos dois lados fica lento.`, fix: `CREATE INDEX CONCURRENTLY idx_${t.name}_${f.cols.join("_")} ON ${t.name} (${f.cols.join(", ")});`, version: m.version, mig: m.label, line: m.line, _fk: { table: t.name, cols: f.cols } };
+        ctx.risks.push(r); fkRisks.push(r);
+      });
+    });
+    const realExpand = ctx.expand.filter(x => x !== "CREATE TABLE" || true);
+    if (realExpand.length && ctx.contract.length) {
+      ctx.risks.push({ sev: "medio", rule: "expandir-contrair", title: "Migration expande e contrai ao mesmo tempo", detail: `Adiciona (${[...new Set(ctx.expand)].join(", ")}) e remove ou troca (${[...new Set(ctx.contract)].join(", ")}). Durante o deploy, a versão antiga do código roda contra o schema novo e quebra.`, fix: "Separe em duas migrations: expandir agora, contrair depois que todo o código novo estiver no ar.", version: m.version, mig: m.label, line: m.line });
+    }
+    if (ctx.concurrent) {
+      if (m.stmts.length > 1) ctx.risks.push({ sev: "medio", rule: "concurrently-transacao", title: "CONCURRENTLY junto com outros comandos", detail: "CREATE INDEX CONCURRENTLY não roda dentro de transação. O Flyway executa cada migration numa transação e recusa a mistura.", fix: "Deixe o índice concorrente sozinho numa migration própria.", version: m.version, mig: m.label, line: m.line });
+      else ctx.risks.push({ sev: "info", rule: "concurrently-transacao", title: "Migration fora de transação", detail: "Com CONCURRENTLY o Flyway roda esta migration sem transação: se falhar, sobra um índice INVALID para remover.", fix: null, version: m.version, mig: m.label, line: m.line });
+    }
+    m.risks = ctx.risks;
+    m.undo = ctx.undo;
+    m.touched = [...ctx.touched];
+    m.before = before;
+    m.snapshot = clone(model);
+    m.diff = diffModels(before, model);
+  }
+  // FK resolvida por índice criado depois
+  fkRisks.forEach(r => {
+    const t = model.tables[r._fk.table];
+    if (t && fkCovered(model, t, { cols: r._fk.cols })) {
+      r.sev = "baixo";
+      r.detail += " Um índice criado numa migration posterior resolve isso no estado final.";
+    }
+  });
+  return migs;
+}
+
+/* =========================================================
+   5. Saídas: rollback e dry-run
+   ========================================================= */
+function rollbackFor(m) {
+  const num = m.num;
+  const head = [`-- U${num}__${m.name}.sql (undo sugerido para ${m.label})`, `-- Ordem inversa da migration. Revise antes de rodar.`, ""];
+  if (!m.undo.length) return head.concat(["-- nada a desfazer"]).join("\n");
+  return head.concat([...m.undo].reverse().map(s => s)).join("\n");
+}
+function dryRunFor(m) {
+  const L = [`-- Dry-run de ${m.label}`, `-- Rode em homologação, com uma cópia recente da produção.`, `-- Termina em ROLLBACK: nada é gravado.`, "", "BEGIN;", "SET LOCAL lock_timeout = '5s';", "SET LOCAL statement_timeout = '2min';", ""];
+  const existing = m.touched.filter(t => m.before.tables[t]);
+  if (existing.length) {
+    L.push("-- 1. Tamanho das tabelas que já existem e serão alteradas");
+    L.push(existing.map(t => `SELECT '${t}' AS tabela, count(*) AS linhas FROM ${t}`).join("\nUNION ALL\n") + ";", "");
+  }
+  L.push("-- 2. A migration");
+  m.stmts.forEach(s => {
+    if (s.type === "createIndex" && s.conc) {
+      L.push("-- CONCURRENTLY não roda dentro de transação; no dry-run testamos a versão comum:");
+      L.push(s.raw.replace(/\s+CONCURRENTLY\b/i, "") + ";");
+    } else L.push(s.raw + ";");
+  });
+  L.push("");
+  const after = m.touched.filter(t => m.snapshot.tables[t]);
+  if (after.length) {
+    const list = after.map(t => `'${t}'`).join(", ");
+    L.push("-- 3. Conferência do resultado");
+    L.push(`SELECT table_name, column_name, data_type, is_nullable, column_default\n  FROM information_schema.columns\n WHERE table_schema = 'public' AND table_name IN (${list})\n ORDER BY table_name, ordinal_position;`);
+    L.push(`SELECT conrelid::regclass AS tabela, conname, pg_get_constraintdef(oid) AS definicao\n  FROM pg_constraint\n WHERE conrelid::regclass::text IN (${list})\n ORDER BY 1, 2;`, "");
+  }
+  L.push("ROLLBACK;");
+  return L.join("\n");
+}
+
+/* =========================================================
+   UI
+   ========================================================= */
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const KWS = "SELECT|FROM|WHERE|CREATE|TABLE|ALTER|ADD|DROP|COLUMN|CONSTRAINT|PRIMARY|KEY|FOREIGN|REFERENCES|UNIQUE|INDEX|CONCURRENTLY|ON|NOT|NULL|DEFAULT|TYPE|SET|RENAME|TO|BEGIN|ROLLBACK|COMMIT|LOCAL|IF|EXISTS|CHECK|IN|AND|ORDER|BY|UNION|ALL|AS|CASCADE|USING|INSERT|INTO|VALUES|UPDATE|DELETE|VALID|VALIDATE";
+const HL_RE = new RegExp(`(--[^\\n]*)|('(?:[^'\\n]|'')*')|\\b(${KWS})\\b`, "gi");
+const hl = sql => esc(sql).replace(HL_RE, (m, c, s, k) => c ? `<span class="c">${c}</span>` : s ? `<span class="s">${s}</span>` : `<span class="k">${k}</span>`);
+
+const state = { migs: [], sel: -1, zoom: 1, pos: {}, filter: "all", fitted: false };
+const ta = $("sql");
+
+function sevRank(s) { return SEV.indexOf(s); }
+function worst(risks) {
+  const r = risks.filter(x => x.sev !== "info");
+  if (!r.length) return null;
+  return r.reduce((a, b) => sevRank(b.sev) < sevRank(a.sev) ? b : a).sev;
+}
+
+let timer = null;
+function scheduleAnalyze() { clearTimeout(timer); timer = setTimeout(runAnalyze, 220); }
+function runAnalyze() {
+  const keepLabel = state.migs[state.sel] && state.migs[state.sel].label;
+  const wasLast = state.sel === state.migs.length - 1;
+  state.migs = analyze(ta.value);
+  let idx = state.migs.findIndex(m => m.label === keepLabel);
+  if (idx < 0 || wasLast) idx = state.migs.length - 1;
+  state.sel = idx;
+  renderAll();
+}
+
+function renderGutter() {
+  const n = ta.value.split("\n").length;
+  const marks = {};
+  const headers = new Set(state.migs.map(m => m.line));
+  state.migs.forEach(m => m.risks.forEach(r => {
+    if (r.sev === "info") return;
+    const cur = marks[r.line];
+    if (!cur || sevRank(r.sev) < sevRank(cur)) marks[r.line] = r.sev;
+  }));
+  let h = "";
+  for (let i = 1; i <= n; i++) h += `<div class="${marks[i] ? "m-" + marks[i] : headers.has(i) ? "hd" : ""}">${i}</div>`;
+  $("gutter").innerHTML = h;
+  $("gutter").scrollTop = ta.scrollTop;
+  $("st-lines").textContent = `${n} linhas · ${state.migs.length} migration${state.migs.length === 1 ? "" : "s"}`;
+  const errs = state.migs.reduce((a, m) => a + m.risks.filter(r => r.sev === "erro").length, 0);
+  const st = $("st-parse");
+  st.className = errs ? "badc" : "okc";
+  st.textContent = errs ? `${errs} erro${errs > 1 ? "s" : ""} de leitura ou aplicação` : "SQL lido sem erros";
+}
+
+function renderTimeline() {
+  const el = $("timeline");
+  if (!state.migs.length) { el.innerHTML = `<span class="none">Nenhuma migration ainda.</span>`; return; }
+  el.innerHTML = state.migs.map((m, i) => {
+    const w = worst(m.risks);
+    const cnt = m.risks.filter(r => r.sev !== "info").length;
+    return `<button class="tl" type="button" data-i="${i}" aria-pressed="${i === state.sel}" title="${esc(m.label)}">
+      <span class="v">${esc(m.version)}<span class="dot ${w || ""}">${cnt}</span></span>
+      <span class="n">${esc(m.name.replace(/_/g, " "))}</span></button>`;
+  }).join("");
+}
+
+/* ---------- diagrama ---------- */
+const HEAD = 34, ROW = 22, PADB = 8, CH = 7.1;
+function tableSize(t) {
+  const nameW = t.name.length * 8.4 + 60;
+  const colW = Math.max(0, ...t.cols.map(c => 32 + c.name.length * CH + 24 + (c.type.length + (c.nullable ? 0 : 4)) * 6.75 + 14));
+  return { w: Math.round(Math.max(190, nameW, colW)), h: HEAD + t.cols.length * ROW + PADB };
+}
+function autoLayout(model) {
+  const tables = Object.values(model.tables);
+  const rank = {};
+  const visiting = new Set();
+  const getRank = n => {
+    if (rank[n] != null) return rank[n];
+    if (visiting.has(n)) return 0;
+    visiting.add(n);
+    const t = model.tables[n];
+    let r = 0;
+    t.fks.forEach(f => { if (f.refTable !== n && model.tables[f.refTable]) r = Math.max(r, getRank(f.refTable) + 1); });
+    visiting.delete(n);
+    return (rank[n] = r);
+  };
+  tables.forEach(t => getRank(t.name));
+  const cols = {};
+  tables.forEach(t => (cols[rank[t.name]] = cols[rank[t.name]] || []).push(t));
+  const out = {};
+  let x = 30;
+  Object.keys(cols).map(Number).sort((a, b) => a - b).forEach(r => {
+    const list = cols[r].sort((a, b) => compareVersion(a.origin.slice(1), b.origin.slice(1)) || a.name.localeCompare(b.name));
+    let y = 30, maxW = 0;
+    list.forEach(t => { const s = tableSize(t); out[t.name] = { x, y }; y += s.h + 34; maxW = Math.max(maxW, s.w); });
+    x += maxW + 96;
+  });
+  return out;
+}
+
+let diag = null;
+function renderDiagram() {
+  const box = $("canvas");
+  const m = state.migs[state.sel];
+  $("dg-ver").textContent = m ? m.label : "—";
+  if (!m || !Object.keys(m.snapshot.tables).length) {
+    box.innerHTML = `<div class="empty">${m ? "Nenhuma tabela nesta versão." : "Cole uma migration no editor para ver o diagrama."}</div>`;
+    $("stats").innerHTML = ""; $("removed").innerHTML = ""; diag = null;
+    return;
+  }
+  const model = m.snapshot, d = m.diff;
+  const auto = autoLayout(model);
+  const sizes = {}, pos = {};
+  Object.values(model.tables).forEach(t => {
+    sizes[t.name] = tableSize(t);
+    pos[t.name] = state.pos[t.name] ? { ...state.pos[t.name] } : auto[t.name];
+  });
+  const edges = [];
+  Object.values(model.tables).forEach(t => t.fks.forEach(f => {
+    const p = model.tables[f.refTable];
+    if (!p) return;
+    const refCols = f.refCols || p.pk;
+    edges.push({ child: t.name, parent: p.name, cr: t.cols.findIndex(c => c.name === f.cols[0]), pr: p.cols.findIndex(c => c.name === (refCols || [])[0]), isNew: f.origin === m.version });
+  }));
+  diag = { model, sizes, pos, edges, m };
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  Object.keys(pos).forEach(n => { const p = pos[n], s = sizes[n]; minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x + s.w); maxY = Math.max(maxY, p.y + s.h); });
+  minX -= 40; minY -= 30; maxX += 60; maxY += 30;
+  const vbW = maxX - minX, vbH = maxY - minY;
+  diag.vb = { minX, minY, vbW, vbH };
+  if (!state.fitted) { state.zoom = fitZoom(vbW, vbH); state.fitted = true; }
+
+  let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${minX} ${minY} ${vbW} ${vbH}" width="${Math.round(vbW * state.zoom)}" height="${Math.round(vbH * state.zoom)}" role="img" aria-label="Diagrama entidade-relacionamento de ${esc(m.label)}">`;
+  s += `<g id="edges">` + edges.map((e, i) => `<g data-e="${i}"><path class="edge${e.isNew ? " new" : ""}"/><circle r="3.2" class="edge-start${e.isNew ? " new" : ""}"/><circle r="4" class="edge-end${e.isNew ? " new" : ""}"/></g>`).join("") + `</g>`;
+  Object.values(model.tables).forEach(t => {
+    const sz = sizes[t.name], p = pos[t.name];
+    const isNew = d.addedTables.includes(t.name);
+    const added = d.addedCols[t.name] || [], changed = d.changedCols[t.name] || [];
+    const fkCols = new Set(t.fks.flatMap(f => f.cols));
+    s += `<g class="tbl${isNew ? " new" : ""}" data-t="${esc(t.name)}" transform="translate(${p.x},${p.y})" tabindex="0" role="group" aria-label="Tabela ${esc(t.name)}, ${t.cols.length} colunas">`;
+    s += `<rect class="tbox" width="${sz.w}" height="${sz.h}" rx="8"/>`;
+    s += `<path class="thead" d="M0 8 a8 8 0 0 1 8 -8 h${sz.w - 16} a8 8 0 0 1 8 8 v${HEAD - 8} h-${sz.w} z"/>`;
+    s += `<text class="tname" x="12" y="22">${esc(t.name)}</text>`;
+    if (isNew) s += `<text class="tnew" x="${sz.w - 10}" y="21" text-anchor="end">NOVA</text>`;
+    t.cols.forEach((c, i) => {
+      const y = HEAD + i * ROW;
+      const cls = ["row", t.pk.includes(c.name) ? "pk" : "", added.includes(c.name) && !isNew ? "new" : "", changed.includes(c.name) ? "chg" : ""].join(" ");
+      s += `<g class="${cls}"><title>${esc(`${c.name} ${c.type}${!c.nullable ? " NOT NULL" : ""}${c.def ? " DEFAULT " + c.def : ""}`)}</title>`;
+      if (i) s += `<line class="rowline" x1="8" x2="${sz.w - 8}" y1="${y}" y2="${y}"/>`;
+      if (t.pk.includes(c.name)) s += `<text class="badge-pk" x="10" y="${y + 15}">PK</text>`;
+      else if (fkCols.has(c.name)) s += `<text class="badge-fk" x="10" y="${y + 15}">FK</text>`;
+      s += `<text class="cname" x="32" y="${y + 15}">${esc(c.name)}${c.nullable ? "" : ""}</text>`;
+      s += `<text class="ctype" x="${sz.w - 12}" y="${y + 15}" text-anchor="end">${esc(c.type)}${c.nullable ? "" : " ·nn"}</text></g>`;
+    });
+    s += `</g>`;
+  });
+  s += `</svg>`;
+  box.innerHTML = s;
+  drawEdges();
+
+  const rm = [];
+  if (d.removedTables.length) rm.push(`tabela ${d.removedTables.map(x => `<b>${esc(x)}</b>`).join(", ")}`);
+  if (d.removedCols.length) rm.push(`coluna ${d.removedCols.map(x => `<b>${esc(x)}</b>`).join(", ")}`);
+  $("removed").innerHTML = rm.length ? `Removido em ${esc(m.version)}: ${rm.join("; ")}.` : "";
+  const nCols = Object.values(model.tables).reduce((a, t) => a + t.cols.length, 0);
+  const nFk = Object.values(model.tables).reduce((a, t) => a + t.fks.length, 0);
+  const nIx = Object.keys(model.indexes).length + Object.values(model.tables).reduce((a, t) => a + (t.pk.length ? 1 : 0) + t.uniques.length, 0);
+  $("stats").innerHTML = `<span><b>${Object.keys(model.tables).length}</b> tabelas</span><span><b>${nCols}</b> colunas</span><span><b>${nFk}</b> chaves estrangeiras</span><span><b>${nIx}</b> índices</span><span>·nn = NOT NULL</span>`;
+}
+function fitZoom(w, h) {
+  const box = $("canvas");
+  const z = Math.min((box.clientWidth - 8) / w, (box.clientHeight - 8) / h);
+  return Math.max(0.35, Math.min(1.1, z || 1));
+}
+function edgePath(e) {
+  const { sizes, pos } = diag;
+  const c = pos[e.child], cs = sizes[e.child], p = pos[e.parent], ps = sizes[e.parent];
+  const cy = c.y + (e.cr >= 0 ? HEAD + e.cr * ROW + ROW / 2 : HEAD / 2);
+  const py = p.y + (e.pr >= 0 ? HEAD + e.pr * ROW + ROW / 2 : HEAD / 2);
+  let x1, x2, c1, c2;
+  if (e.child === e.parent) {
+    x1 = c.x + cs.w; x2 = c.x + cs.w; const o = 46;
+    return { d: `M${x1} ${cy} C${x1 + o} ${cy}, ${x2 + o} ${py}, ${x2} ${py}`, x1, y1: cy, x2, y2: py };
+  }
+  if (p.x + ps.w + 20 < c.x) { x1 = c.x; x2 = p.x + ps.w; c1 = x1 - 60; c2 = x2 + 60; }
+  else if (c.x + cs.w + 20 < p.x) { x1 = c.x + cs.w; x2 = p.x; c1 = x1 + 60; c2 = x2 - 60; }
+  else { x1 = c.x + cs.w; x2 = p.x + ps.w; const o = Math.max(x1, x2) + 50; c1 = o; c2 = o; }
+  return { d: `M${x1} ${cy} C${c1} ${cy}, ${c2} ${py}, ${x2} ${py}`, x1, y1: cy, x2, y2: py };
+}
+function drawEdges() {
+  if (!diag) return;
+  document.querySelectorAll("#edges > g").forEach(g => {
+    const e = diag.edges[+g.dataset.e];
+    const r = edgePath(e);
+    g.children[0].setAttribute("d", r.d);
+    g.children[1].setAttribute("cx", r.x1); g.children[1].setAttribute("cy", r.y1);
+    g.children[2].setAttribute("cx", r.x2); g.children[2].setAttribute("cy", r.y2);
+  });
+}
+function moveTable(name, x, y) {
+  diag.pos[name] = { x, y };
+  state.pos[name] = { x, y };
+  const g = document.querySelector(`.tbl[data-t="${CSS.escape(name)}"]`);
+  if (g) g.setAttribute("transform", `translate(${x},${y})`);
+  drawEdges();
+}
+let drag = null;
+function svgPoint(svg, ev) {
+  const pt = svg.createSVGPoint();
+  pt.x = ev.clientX; pt.y = ev.clientY;
+  return pt.matrixTransform(svg.getScreenCTM().inverse());
+}
+$("canvas").addEventListener("pointerdown", ev => {
+  const g = ev.target.closest(".tbl");
+  if (!g || !diag) return;
+  const svg = g.ownerSVGElement;
+  const p = svgPoint(svg, ev);
+  const name = g.dataset.t;
+  drag = { name, svg, dx: p.x - diag.pos[name].x, dy: p.y - diag.pos[name].y, moved: false };
+  svg.setPointerCapture(ev.pointerId);
+  g.parentNode.appendChild(g);
+  g.focus({ preventScroll: true });
+});
+$("canvas").addEventListener("pointermove", ev => {
+  if (!drag) return;
+  const p = svgPoint(drag.svg, ev);
+  drag.moved = true;
+  moveTable(drag.name, Math.round(p.x - drag.dx), Math.round(p.y - drag.dy));
+});
+const endDrag = () => { if (drag && drag.moved) { drag = null; renderDiagram(); } else drag = null; };
+$("canvas").addEventListener("pointerup", endDrag);
+$("canvas").addEventListener("pointercancel", endDrag);
+$("canvas").addEventListener("keydown", ev => {
+  const g = ev.target.closest && ev.target.closest(".tbl");
+  if (!g || !diag) return;
+  const k = { ArrowLeft: [-12, 0], ArrowRight: [12, 0], ArrowUp: [0, -12], ArrowDown: [0, 12] }[ev.key];
+  if (!k) return;
+  ev.preventDefault();
+  const p = diag.pos[g.dataset.t];
+  moveTable(g.dataset.t, p.x + k[0], p.y + k[1]);
+});
+function setZoom(z) {
+  state.zoom = Math.max(0.3, Math.min(2.2, z));
+  const svg = $("canvas").querySelector("svg");
+  if (svg && diag) { svg.setAttribute("width", Math.round(diag.vb.vbW * state.zoom)); svg.setAttribute("height", Math.round(diag.vb.vbH * state.zoom)); }
+}
+$("z-in").onclick = () => setZoom(state.zoom * 1.2);
+$("z-out").onclick = () => setZoom(state.zoom / 1.2);
+$("z-fit").onclick = () => { if (diag) setZoom(fitZoom(diag.vb.vbW, diag.vb.vbH)); };
+$("z-reset").onclick = () => { state.pos = {}; state.fitted = false; renderDiagram(); };
+
+/* ---------- riscos ---------- */
+function renderRisks() {
+  const m = state.migs[state.sel];
+  const all = state.migs.flatMap(x => x.risks);
+  const list = (state.filter === "sel" && m ? m.risks : all).slice().sort((a, b) => sevRank(a.sev) - sevRank(b.sev) || a.line - b.line);
+  $("cnt-riscos").textContent = all.filter(r => r.sev !== "info").length;
+  const counts = {};
+  list.forEach(r => counts[r.sev] = (counts[r.sev] || 0) + 1);
+  $("risk-sum").innerHTML = SEV.filter(s => counts[s]).map(s => `<span class="pill ${s}">${counts[s]} ${SEV_LABEL[s]}</span>`).join("") +
+    `<div class="seg" role="group" aria-label="Filtrar riscos"><button type="button" data-f="all" aria-pressed="${state.filter === "all"}">Todas as versões</button><button type="button" data-f="sel" aria-pressed="${state.filter === "sel"}">Só ${m ? esc(m.version) : "—"}</button></div>`;
+  $("risk-list").innerHTML = list.length ? list.map(r => `<li><button type="button" class="risk ${r.sev}" data-line="${r.line}">
+      <span class="where"><span class="pill ${r.sev}">${SEV_LABEL[r.sev]}</span><span>${esc(r.version)} · linha ${r.line}</span></span>
+      <span><h3>${esc(r.title)}</h3><p>${esc(r.detail || "")}</p>${r.fix ? `<p class="fix">${esc(r.fix)}</p>` : ""}</span></button></li>`).join("")
+    : `<li class="none">Nenhum risco encontrado${state.filter === "sel" ? " nesta versão" : ""}.</li>`;
+}
+$("risk-sum").addEventListener("click", ev => {
+  const b = ev.target.closest("button[data-f]");
+  if (!b) return;
+  state.filter = b.dataset.f;
+  renderRisks();
+});
+$("risk-list").addEventListener("click", ev => {
+  const b = ev.target.closest(".risk");
+  if (b) jumpToLine(+b.dataset.line);
+});
+function jumpToLine(n) {
+  const lines = ta.value.split("\n");
+  let start = 0;
+  for (let i = 0; i < n - 1 && i < lines.length; i++) start += lines[i].length + 1;
+  const end = start + (lines[n - 1] || "").length;
+  ta.focus({ preventScroll: true });
+  ta.setSelectionRange(start, end);
+  ta.scrollTop = Math.max(0, (n - 1) * 20 - ta.clientHeight / 3);
+  $("gutter").scrollTop = ta.scrollTop;
+  ta.closest(".card").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "nearest" });
+}
+
+function renderCode() {
+  const m = state.migs[state.sel];
+  if (!m) { $("rb-code").innerHTML = ""; $("dr-code").innerHTML = ""; return; }
+  $("rb-title").textContent = `Rollback de ${m.label}`;
+  $("dr-title").textContent = `Dry-run de ${m.label}`;
+  $("rb-code").innerHTML = hl(rollbackFor(m));
+  $("dr-code").innerHTML = hl(dryRunFor(m));
+}
+
+function renderAll() {
+  renderGutter();
+  renderTimeline();
+  renderDiagram();
+  renderRisks();
+  renderCode();
+}
+
+$("timeline").addEventListener("click", ev => {
+  const b = ev.target.closest(".tl");
+  if (!b) return;
+  state.sel = +b.dataset.i;
+  renderTimeline(); renderDiagram(); renderCode();
+  if (state.filter === "sel") renderRisks(); else renderRisks();
+});
+
+/* ---------- editor ---------- */
+ta.addEventListener("input", () => { renderGutterLight(); scheduleAnalyze(); });
+ta.addEventListener("scroll", () => { $("gutter").scrollTop = ta.scrollTop; });
+ta.addEventListener("keydown", ev => {
+  if (ev.key === "Tab" && !ev.shiftKey && !ev.ctrlKey && !ev.metaKey) {
+    ev.preventDefault();
+    const s = ta.selectionStart, e = ta.selectionEnd;
+    ta.setRangeText("  ", s, e, "end");
+    scheduleAnalyze();
+  }
+});
+function renderGutterLight() {
+  const n = ta.value.split("\n").length;
+  const g = $("gutter");
+  if (g.children.length !== n) {
+    let h = ""; for (let i = 1; i <= n; i++) h += `<div>${i}</div>`;
+    g.innerHTML = h; g.scrollTop = ta.scrollTop;
+  }
+}
+$("b-example").onclick = () => { ta.value = EXEMPLO; state.pos = {}; state.fitted = false; state.sel = -1; runAnalyze(); toast("Exemplo restaurado"); };
+$("b-clear").onclick = () => { ta.value = ""; state.pos = {}; state.fitted = false; runAnalyze(); ta.focus(); };
+$("f-sql").addEventListener("change", async ev => {
+  const files = [...ev.target.files].sort((a, b) => {
+    const va = /^V(\d+(?:[._]\d+)*)__/i.exec(a.name), vb = /^V(\d+(?:[._]\d+)*)__/i.exec(b.name);
+    return va && vb ? compareVersion(va[1], vb[1]) : a.name.localeCompare(b.name);
+  });
+  if (!files.length) return;
+  const parts = [];
+  let n = 1;
+  for (const f of files) {
+    const txt = await f.text();
+    const hasHeader = /^\s*--\s*V\d/m.test(txt);
+    if (hasHeader) parts.push(txt.trim());
+    else {
+      const head = /^V\d+(?:[._]\d+)*__.+\.sql$/i.test(f.name) ? f.name : `V${n}__${f.name.replace(/\.sql$/i, "").replace(/[^\w]+/g, "_")}.sql`;
+      parts.push(`-- ${head}\n${txt.trim()}`);
+    }
+    n++;
+  }
+  ta.value = parts.join("\n\n") + "\n";
+  state.pos = {}; state.fitted = false; state.sel = -1;
+  runAnalyze();
+  toast(`${files.length} arquivo${files.length > 1 ? "s" : ""} carregado${files.length > 1 ? "s" : ""}`);
+  ev.target.value = "";
+});
+
+/* ---------- abas ---------- */
+const tabs = [...document.querySelectorAll(".tab")];
+function selectTab(tab) {
+  tabs.forEach(t => {
+    const on = t === tab;
+    t.setAttribute("aria-selected", on);
+    t.tabIndex = on ? 0 : -1;
+    $(t.getAttribute("aria-controls")).hidden = !on;
+  });
+}
+tabs.forEach((t, i) => {
+  t.addEventListener("click", () => selectTab(t));
+  t.addEventListener("keydown", ev => {
+    const d = ev.key === "ArrowRight" ? 1 : ev.key === "ArrowLeft" ? -1 : 0;
+    if (!d) return;
+    const nx = tabs[(i + d + tabs.length) % tabs.length];
+    selectTab(nx); nx.focus();
+  });
+});
+selectTab(tabs[0]);
+$("go-about").addEventListener("click", ev => { ev.preventDefault(); selectTab($("t-sobre")); $("t-sobre").scrollIntoView({ block: "start" }); $("t-sobre").focus({ preventScroll: true }); });
+
+document.querySelectorAll("[data-copy]").forEach(b => b.addEventListener("click", async () => {
+  const txt = $(b.dataset.copy).textContent;
+  try { await navigator.clipboard.writeText(txt); toast("Copiado"); }
+  catch (e) {
+    const r = document.createRange(); r.selectNodeContents($(b.dataset.copy));
+    const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    toast("Texto selecionado: use Ctrl+C");
+  }
+}));
+let toastT = null;
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), 1800); }
+
+window.addEventListener("resize", () => {});
+
+/* =========================================================
+   Testes automáticos do parser e do linter
+   ========================================================= */
+function runTests() {
+  const T = [];
+  const test = (name, fn) => { try { const r = fn(); T.push({ name, ok: r === true, msg: r === true ? "" : String(r) }); } catch (e) { T.push({ name, ok: false, msg: e.message }); } };
+  const last = txt => { const m = analyze(txt); return m[m.length - 1]; };
+  const rules = txt => analyze(txt).flatMap(m => m.risks);
+  const has = (rs, rule, sev) => rs.some(r => r.rule === rule && (!sev || r.sev === sev));
+  const expect = (cond, msg) => cond ? true : msg;
+
+  test("Separa as migrations pelo cabeçalho Flyway", () => {
+    const m = analyze("-- V1__a.sql\nCREATE TABLE a (id int PRIMARY KEY);\n-- V2__b.sql\nCREATE TABLE b (id int PRIMARY KEY);");
+    return expect(m.length === 2 && m[0].version === "V1" && m[1].name === "b", "esperava V1 e V2");
+  });
+  test("Ordena por versão numérica (V2 antes de V10)", () => {
+    const m = analyze("-- V10__z.sql\nCREATE TABLE z (id int PRIMARY KEY);\n-- V2__a.sql\nCREATE TABLE a (id int PRIMARY KEY);");
+    return expect(m[0].version === "V2" && m[1].version === "V10", `ordem: ${m.map(x => x.version)}`);
+  });
+  test("CREATE TABLE com tipos parametrizados e DEFAULT", () => {
+    const t = last("CREATE TABLE p (id bigserial PRIMARY KEY, valor numeric(15,2) NOT NULL DEFAULT 0, nome varchar(200));").snapshot.tables.p;
+    const v = t.cols[1];
+    return expect(t.cols.length === 3 && v.type === "numeric(15,2)" && !v.nullable && v.def === "0" && t.pk[0] === "id", JSON.stringify(v));
+  });
+  test("Comentário e ; dentro de string não quebram o comando", () => {
+    const m = last("CREATE TABLE t (id int PRIMARY KEY, obs text DEFAULT 'a;b' -- fim ;\n);");
+    return expect(m.stmts.length === 1 && m.snapshot.tables.t.cols[1].def === "'a;b'", `stmts=${m.stmts.length}`);
+  });
+  test("Dollar quoting em função não vira dois comandos", () => {
+    const m = last("CREATE TABLE t (id int PRIMARY KEY);\nCREATE FUNCTION f() RETURNS int AS $$ SELECT 1; SELECT 2; $$ LANGUAGE sql;");
+    return expect(m.stmts.length === 2, `stmts=${m.stmts.length}`);
+  });
+  test("FK inline aponta para a tabela referenciada", () => {
+    const t = last("CREATE TABLE a (id int PRIMARY KEY);\nCREATE TABLE b (id int PRIMARY KEY, a_id int REFERENCES a);").snapshot.tables.b;
+    return expect(t.fks.length === 1 && t.fks[0].refTable === "a" && t.fks[0].name === "b_a_id_fkey", JSON.stringify(t.fks));
+  });
+  test("DROP COLUMN é crítico", () => {
+    return expect(has(rules("-- V1__a.sql\nCREATE TABLE a (id int PRIMARY KEY, x int);\n-- V2__b.sql\nALTER TABLE a DROP COLUMN x;"), "drop-column", "crit"), "não acusou");
+  });
+  test("NOT NULL sem DEFAULT só acusa em tabela que já existia", () => {
+    const sim = has(rules("-- V1__a.sql\nCREATE TABLE a (id int PRIMARY KEY);\n-- V2__b.sql\nALTER TABLE a ADD COLUMN y int NOT NULL;"), "not-null-sem-default");
+    const nao = has(rules("-- V1__a.sql\nCREATE TABLE a (id int PRIMARY KEY);\nALTER TABLE a ADD COLUMN y int NOT NULL;"), "not-null-sem-default");
+    return expect(sim && !nao, `existente=${sim} mesma_migration=${nao}`);
+  });
+  test("CREATE INDEX sem CONCURRENTLY em tabela existente", () => {
+    const sem = has(rules("-- V1__a.sql\nCREATE TABLE a (id int PRIMARY KEY, x int);\n-- V2__b.sql\nCREATE INDEX ix ON a (x);"), "index-sem-concurrently");
+    const com = has(rules("-- V1__a.sql\nCREATE TABLE a (id int PRIMARY KEY, x int);\n-- V2__b.sql\nCREATE INDEX CONCURRENTLY ix ON a (x);"), "index-sem-concurrently");
+    return expect(sem && !com, `sem=${sem} com=${com}`);
+  });
+  test("FK sem índice é detectada; índice na coluna resolve", () => {
+    const base = "CREATE TABLE a (id int PRIMARY KEY);\nCREATE TABLE b (id int PRIMARY KEY, a_id int REFERENCES a (id));";
+    return expect(has(rules(base), "fk-sem-indice") && !has(rules(base + "\nCREATE INDEX ix_b_a ON b (a_id);"), "fk-sem-indice"), "detecção incorreta");
+  });
+  test("UNIQUE composta cobre a FK pelo prefixo", () => {
+    return expect(!has(rules("CREATE TABLE a (id int PRIMARY KEY);\nCREATE TABLE b (id int PRIMARY KEY, a_id int REFERENCES a, x int, UNIQUE (a_id, x));"), "fk-sem-indice"), "acusou indevidamente");
+  });
+  test("Tabela sem PRIMARY KEY", () => expect(has(rules("CREATE TABLE log (msg text);"), "sem-pk"), "não acusou"));
+  test("RENAME COLUMN propaga para a FK de outra tabela", () => {
+    const m = last("-- V1__a.sql\nCREATE TABLE a (id int PRIMARY KEY);\nCREATE TABLE b (id int PRIMARY KEY, a_id int REFERENCES a (id));\n-- V2__b.sql\nALTER TABLE a RENAME COLUMN id TO codigo;");
+    return expect(m.snapshot.tables.b.fks[0].refCols[0] === "codigo" && has(m.risks, "rename", "alto"), JSON.stringify(m.snapshot.tables.b.fks));
+  });
+  test("Aumentar varchar é baixo; trocar para int é alto", () => {
+    const b = "-- V1__a.sql\nCREATE TABLE a (id int PRIMARY KEY, n varchar(50));\n-- V2__b.sql\n";
+    return expect(has(rules(b + "ALTER TABLE a ALTER COLUMN n TYPE varchar(100);"), "alter-type", "baixo") && has(rules(b + "ALTER TABLE a ALTER COLUMN n TYPE integer USING n::int;"), "alter-type", "alto"), "severidade errada");
+  });
+  test("Migration que expande e contrai ao mesmo tempo", () => {
+    return expect(has(rules("-- V1__a.sql\nCREATE TABLE a (id int PRIMARY KEY, x int);\n-- V2__b.sql\nALTER TABLE a ADD COLUMN y int;\nALTER TABLE a DROP COLUMN x;"), "expandir-contrair"), "não acusou");
+  });
+  test("DROP TABLE referenciada sem CASCADE", () => {
+    return expect(has(rules("-- V1__a.sql\nCREATE TABLE a (id int PRIMARY KEY);\nCREATE TABLE b (id int PRIMARY KEY, a_id int REFERENCES a);\nCREATE INDEX ix ON b (a_id);\n-- V2__b.sql\nDROP TABLE a;"), "drop-referenciada"), "não acusou");
+  });
+  test("UPDATE sem WHERE é alto", () => expect(has(rules("CREATE TABLE a (id int PRIMARY KEY, s text);\nUPDATE a SET s = 'x';"), "dml-sem-where", "alto"), "não acusou"));
+  test("Rollback de ADD COLUMN é DROP COLUMN", () => {
+    const m = last("-- V1__a.sql\nCREATE TABLE a (id int PRIMARY KEY);\n-- V2__b.sql\nALTER TABLE a ADD COLUMN y int;");
+    return expect(rollbackFor(m).includes("ALTER TABLE a DROP COLUMN y;"), rollbackFor(m));
+  });
+  test("Rollback de RENAME e ALTER TYPE volta ao estado anterior", () => {
+    const m = last("-- V1__a.sql\nCREATE TABLE a (id int PRIMARY KEY, n varchar(50));\n-- V2__b.sql\nALTER TABLE a ALTER COLUMN n TYPE text;\nALTER TABLE a RENAME COLUMN n TO nome;");
+    const rb = rollbackFor(m);
+    return expect(rb.indexOf("RENAME COLUMN nome TO n") > -1 && rb.indexOf("TYPE varchar(50)") > rb.indexOf("RENAME COLUMN nome TO n"), rb);
+  });
+  test("Dry-run termina em ROLLBACK e troca CONCURRENTLY", () => {
+    const m = last("-- V1__a.sql\nCREATE TABLE a (id int PRIMARY KEY, x int);\n-- V2__b.sql\nCREATE INDEX CONCURRENTLY ix ON a (x);");
+    const dr = dryRunFor(m);
+    return expect(/ROLLBACK;$/.test(dr) && dr.includes("CREATE INDEX ix ON a (x);") && dr.startsWith("-- Dry-run"), dr);
+  });
+  test("Erro de sintaxe vira aviso com linha, sem travar", () => {
+    const rs = rules("-- V1__a.sql\nCREATE TABLE a (id int PRIMARY KEY;\nCREATE TABLE b (id int PRIMARY KEY);");
+    const e = rs.find(r => r.rule === "erro");
+    return expect(e && e.line === 2, JSON.stringify(e));
+  });
+  test("Exemplo da loja: 8 tabelas e riscos de todos os tipos plantados", () => {
+    const m = analyze(EXEMPLO);
+    const rs = m.flatMap(x => x.risks);
+    const need = ["drop-table", "drop-column", "not-null-sem-default", "alter-type", "index-sem-concurrently", "fk-sem-indice", "sem-pk", "rename", "expandir-contrair", "dml-sem-where", "concurrently-transacao"];
+    const miss = need.filter(r => !has(rs, r));
+    const nT = Object.keys(m[m.length - 1].snapshot.tables).length;
+    return expect(m.length === 6 && nT === 8 && !miss.length && !has(rs, "erro"), `migs=${m.length} tabelas=${nT} faltando=${miss}`);
+  });
+  return T;
+}
+
+function renderTests() {
+  const T = runTests();
+  const ok = T.filter(t => t.ok).length;
+  const s = $("tests-sum");
+  s.className = "tests-sum" + (ok === T.length ? "" : " fail");
+  s.innerHTML = `<span>${ok}/${T.length}</span> testes passaram`;
+  $("cnt-testes").textContent = `${ok}/${T.length}`;
+  $("tests").innerHTML = T.map(t => `<li class="${t.ok ? "pass" : "fail"}"><span class="r">${t.ok ? "✓" : "✗"}</span><span>${esc(t.name)}${t.ok ? "" : `<small>${esc(t.msg)}</small>`}</span></li>`).join("");
+  window.__testResults = T;
+}
+
+/* início */
+ta.value = EXEMPLO;
+runAnalyze();
+renderTests();
+</script>
+</body>
+</html>

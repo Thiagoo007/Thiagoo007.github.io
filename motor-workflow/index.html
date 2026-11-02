@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Motor de Workflow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Layout: app de uma tela com abas; simulador em duas colunas (lista de processos + detalhe) */
+  --ink: #0b0f1a;
+  --ink-2: #131a2b;
+  --ink-3: #1a2338;
+  --line: #24304a;
+  --paper: #eef1f7;
+  --soft: #c9d0de;
+  --muted: #8b96ad;
+  --flare: #ff6b35;
+  --ok: #4fd1a1;
+  --warn: #ffc857;
+  --back: #7aa2ff;
+  --bad: #ff5d6c;
+  --display: "Bricolage Grotesque", "Arial Black", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--ink); color: var(--paper); font-family: var(--body); font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+a { color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--flare); outline-offset: 2px; }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 0 clamp(16px, 3vw, 32px); }
+
+/* topo */
+.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; padding: 22px 0 18px; border-bottom: 1px solid var(--line); }
+.brand h1 { font-family: var(--display); font-weight: 800; font-size: clamp(28px, 4vw, 40px); letter-spacing: -.035em; line-height: 1; margin: 0; }
+.brand h1 span { color: var(--flare); }
+.brand p { margin: 6px 0 0; font-family: var(--mono); font-size: 12.5px; color: var(--muted); }
+.brand p a { color: var(--paper); text-decoration: none; border-bottom: 1px solid var(--line); }
+.brand p a:hover { border-color: var(--flare); }
+.clock { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-family: var(--mono); font-size: 13px; }
+.clock .now { padding: 7px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--ink-2); }
+.clock .now b { color: var(--flare); }
+.clock input { width: 64px; }
+
+/* abas */
+.tabs { display: flex; gap: 4px; overflow-x: auto; padding: 14px 0 0; border-bottom: 1px solid var(--line); }
+.tab { background: none; border: 0; border-bottom: 2px solid transparent; padding: 10px 14px; font-family: var(--mono); font-size: 13px; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.tab:hover { color: var(--paper); }
+.tab[aria-selected="true"] { color: var(--paper); border-bottom-color: var(--flare); }
+.tab .cnt { font-size: 11px; padding: 1px 6px; border-radius: 999px; background: var(--line); margin-left: 6px; }
+.tab .cnt.ok { background: rgba(79,209,161,.18); color: var(--ok); }
+.tab .cnt.bad { background: rgba(255,93,108,.18); color: var(--bad); }
+.panel { padding: 24px 0 56px; }
+.panel[hidden] { display: none; }
+
+/* controles */
+.btn { display: inline-flex; align-items: center; gap: 6px; background: var(--ink-3); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; font-family: var(--mono); font-size: 12.5px; cursor: pointer; transition: border-color .15s, background .15s; }
+.btn:hover:not(:disabled) { border-color: var(--flare); }
+.btn.primary { background: var(--flare); border-color: var(--flare); color: var(--ink); font-weight: 600; }
+.btn.primary:hover:not(:disabled) { background: #ff8457; }
+.btn.ghost { background: transparent; }
+.btn.danger:hover:not(:disabled) { border-color: var(--bad); color: var(--bad); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+input[type=text], input[type=number], select, textarea { background: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; font-size: 14px; min-width: 0; }
+textarea { width: 100%; resize: vertical; }
+input:focus, select:focus, textarea:focus { border-color: var(--flare); outline: none; }
+.f { display: grid; gap: 4px; font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+
+.card { background: var(--ink-2); border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
+.card + .card { margin-top: 16px; }
+h2 { font-family: var(--display); font-weight: 800; font-size: 26px; letter-spacing: -.03em; margin: 0 0 4px; line-height: 1.1; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; letter-spacing: -.02em; margin: 0 0 12px; }
+.sub { color: var(--muted); margin: 0 0 18px; max-width: 70ch; }
+.mono { font-family: var(--mono); }
+.muted { color: var(--muted); }
+.msg { font-family: var(--mono); font-size: 12.5px; min-height: 1.4em; margin-top: 8px; }
+.msg.err { color: var(--bad); }
+.msg.okk { color: var(--ok); }
+
+/* chips de status */
+.chip { display: inline-block; font-family: var(--mono); font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; line-height: 1.5; }
+.st-EM_ANDAMENTO { color: var(--flare); }
+.st-CONCLUIDA { color: var(--ok); }
+.st-RETORNADA { color: var(--back); }
+.st-DISPENSADA { color: var(--warn); }
+.st-ENCERRADO { color: var(--ok); }
+.op-AVANCO { color: var(--paper); }
+.op-RETORNO { color: var(--back); }
+.op-SALTO { color: var(--flare); }
+.op-DISPENSA { color: var(--warn); }
+
+/* simulador */
+.sim { display: grid; grid-template-columns: 300px 1fr; gap: 20px; align-items: start; }
+.sim > *, .rgrid > *, .two > *, main, .panel { min-width: 0; }
+.plist { display: grid; gap: 8px; }
+.pitem { text-align: left; width: 100%; background: var(--ink-2); border: 1px solid var(--line); border-left: 3px solid var(--line); border-radius: 8px; padding: 12px 14px; cursor: pointer; display: grid; gap: 6px; }
+.pitem:hover { border-color: #3a4a6b; }
+.pitem[aria-current="true"] { border-color: var(--flare); border-left-color: var(--flare); background: var(--ink-3); }
+.pitem .nm { font-weight: 600; line-height: 1.3; }
+.pitem .meta { display: flex; justify-content: space-between; gap: 8px; align-items: center; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.phead { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 16px; }
+.phead h2 { font-size: 24px; }
+.journey { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+.jstep { flex: 1 0 104px; border: 1px solid var(--line); border-radius: 8px; padding: 10px; background: var(--ink); position: relative; }
+.jstep .c { font-family: var(--mono); font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; }
+.jstep .n { font-size: 13px; font-weight: 600; margin-top: 2px; line-height: 1.25; }
+.jstep::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; border-radius: 0 0 8px 8px; background: transparent; }
+.jstep.s-CONCLUIDA::after { background: var(--ok); }
+.jstep.s-RETORNADA::after { background: var(--back); }
+.jstep.s-DISPENSADA::after { background: var(--warn); }
+.jstep.s-EM_ANDAMENTO::after { background: var(--flare); }
+.jstep.s-DISPENSADA .n { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--warn); }
+.jstep.atual { border-color: var(--flare); background: rgba(255,107,53,.08); }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-family: var(--mono); font-size: 11.5px; color: var(--muted); margin-top: 10px; }
+.legend i { display: inline-block; width: 10px; height: 3px; margin-right: 6px; vertical-align: middle; }
+
+.ops { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(230px, 100%), 1fr)); gap: 8px; margin-top: 12px; }
+.opbtn { text-align: left; background: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; cursor: pointer; display: grid; gap: 4px; }
+.opbtn:hover:not(:disabled) { border-color: var(--flare); }
+.opbtn:disabled { cursor: not-allowed; opacity: .55; }
+.opbtn .t { font-family: var(--mono); font-size: 12px; font-weight: 600; }
+.opbtn .d { font-size: 14px; }
+.opbtn .why { font-family: var(--mono); font-size: 11.5px; color: var(--bad); }
+.opbtn .req { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+.row > .grow { flex: 1 1 220px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+.tbl-wrap { overflow-x: auto; }
+table.t { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+table.t th { text-align: left; font-family: var(--mono); font-size: 11px; font-weight: 400; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+table.t td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.t tr:last-child td { border-bottom: 0; }
+table.t .num { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+table.t tr.undone td { color: var(--muted); }
+table.t tr.undone td.op { text-decoration: line-through; }
+.empty { color: var(--muted); font-family: var(--mono); font-size: 13px; padding: 14px 0; }
+
+/* régua */
+.graph { overflow-x: auto; background: var(--ink); border: 1px solid var(--line); border-radius: 10px; }
+.graph svg { display: block; }
+.issues { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.issues li { font-family: var(--mono); font-size: 12.5px; padding: 8px 10px; border-radius: 6px; border-left: 3px solid; background: var(--ink); }
+.issues li.erro { border-color: var(--bad); }
+.issues li.aviso { border-color: var(--warn); }
+.issues li.valid { border-color: var(--ok); color: var(--ok); }
+.rgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+.addform { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line); }
+.addform input[type=text] { width: 120px; }
+.addform input.nm { width: 170px; }
+.addform input[type=number] { width: 70px; }
+.chk { display: inline-flex; gap: 6px; align-items: center; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+/* métricas */
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-bottom: 16px; }
+.kpi { background: var(--ink-2); padding: 16px 18px; }
+.kpi .k { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+.kpi .v { font-family: var(--display); font-weight: 800; font-size: 32px; letter-spacing: -.03em; line-height: 1.1; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.kpi .v small { font-size: 14px; color: var(--muted); font-weight: 600; letter-spacing: 0; }
+.gargalo { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; padding: 12px 14px; border: 1px solid var(--flare); border-radius: 8px; background: rgba(255,107,53,.08); margin-bottom: 16px; font-size: 14px; }
+.gargalo b { color: var(--flare); font-family: var(--mono); font-size: 12px; }
+
+/* testes */
+.tests { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.tests li { display: grid; grid-template-columns: 52px 1fr; gap: 10px; font-size: 14px; padding: 7px 10px; border-radius: 6px; background: var(--ink); align-items: start; }
+.tests .r { font-family: var(--mono); font-size: 11.5px; font-weight: 600; }
+.tests .r.pass { color: var(--ok); }
+.tests .r.fail { color: var(--bad); }
+.tests .err { display: block; font-family: var(--mono); font-size: 12px; color: var(--bad); }
+
+/* sobre */
+.prose { max-width: 70ch; }
+.prose p, .prose li { color: var(--soft); }
+.prose h3 { margin-top: 26px; }
+.prose code { font-family: var(--mono); font-size: 13px; background: var(--ink-3); padding: 1px 5px; border-radius: 4px; color: var(--paper); }
+.prose pre { font-family: var(--mono); font-size: 12.5px; background: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 14px; overflow-x: auto; color: var(--soft); }
+
+/* diálogo */
+.overlay { position: fixed; inset: 0; background: rgba(5,8,15,.72); display: grid; place-items: center; padding: 16px; z-index: 20; }
+.overlay[hidden] { display: none; }
+.dialog { width: min(640px, 100%); max-height: calc(100% - 32px); overflow: auto; background: var(--ink-2); border: 1px solid var(--line); border-radius: 12px; padding: 22px; }
+.dialog h3 { font-size: 20px; }
+.dialog .acts { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+.dialog textarea { font-family: var(--mono); font-size: 12px; min-height: 260px; }
+
+footer { border-top: 1px solid var(--line); padding: 18px 0 30px; font-family: var(--mono); font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+@media (max-width: 900px) {
+  .sim, .rgrid, .two { grid-template-columns: 1fr; }
+  .kpis { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 420px) {
+  .kpis { grid-template-columns: 1fr; }
+  .clock .now { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1>Motor de Workflow<span>.</span></h1>
+      <p>máquina de estados para processos · por <a href="https://github.com/Thiagoo007" target="_blank" rel="noopener">Thiago Moreira</a></p>
+    </div>
+    <div class="clock" aria-label="Relógio simulado">
+      <div class="now" id="clockNow"></div>
+      <button class="btn" data-action="clock" data-dias="1" type="button">+1 dia</button>
+      <button class="btn" data-action="clock" data-dias="5" type="button">+5 dias</button>
+      <input type="number" id="clockN" min="1" max="365" value="10" aria-label="Número de dias">
+      <button class="btn" data-action="clockN" type="button">Avançar dias</button>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Seções">
+    <button class="tab" role="tab" data-action="tab" data-tab="sim" id="tab-sim" type="button">Simulador</button>
+    <button class="tab" role="tab" data-action="tab" data-tab="regua" id="tab-regua" type="button">Régua <span class="cnt" id="cntRegua"></span></button>
+    <button class="tab" role="tab" data-action="tab" data-tab="metricas" id="tab-metricas" type="button">Métricas</button>
+    <button class="tab" role="tab" data-action="tab" data-tab="testes" id="tab-testes" type="button">Testes <span class="cnt" id="cntTestes"></span></button>
+    <button class="tab" role="tab" data-action="tab" data-tab="sobre" id="tab-sobre" type="button">Sobre o projeto</button>
+  </nav>
+
+  <main>
+    <section class="panel" id="p-sim" role="tabpanel" aria-labelledby="tab-sim"></section>
+    <section class="panel" id="p-regua" role="tabpanel" aria-labelledby="tab-regua" hidden></section>
+    <section class="panel" id="p-metricas" role="tabpanel" aria-labelledby="tab-metricas" hidden></section>
+    <section class="panel" id="p-testes" role="tabpanel" aria-labelledby="tab-testes" hidden></section>
+    <section class="panel" id="p-sobre" role="tabpanel" aria-labelledby="tab-sobre" hidden>
+      <div class="prose">
+        <h2>Sobre o projeto</h2>
+        <p>O Motor de Workflow controla processos que passam por uma sequência de etapas com regras: o que pode avançar, o que pode voltar, o que pode ser pulado e o que exige justificativa. A régua (o desenho do fluxo) é dado, não código, então trocar o fluxo não exige deploy.</p>
+        <p>O exemplo carregado é um fluxo corporativo de compras e reembolsos: valores baixos pulam cotação e diretoria, fornecedor exclusivo dispensa a cotação (e a aprovação da diretoria, que depende dela), e o pagamento só acontece depois da análise financeira.</p>
+
+        <h3>Event sourcing leve</h3>
+        <p>Cada processo guarda só uma lista de eventos: <code>CRIAR</code>, <code>TRANSICAO</code>, <code>NOTA</code> e <code>DESFAZER</code>. O estado (etapa atual, ciclos, status) é sempre recalculado por uma função pura, <code>projetar(regua, eventos)</code>. Por isso a trilha de auditoria é completa por construção: desfazer não apaga nada, apenas grava um evento de compensação que anula o anterior na projeção.</p>
+<pre>eventos ──▶ efetivos() ──▶ projetar() ──▶ { ciclos, atual, encerrado }
+                (remove os desfeitos)</pre>
+
+        <h3>Invariantes</h3>
+        <ul>
+          <li>Existe no máximo um ciclo em andamento por processo, e ele é sempre o da etapa atual.</li>
+          <li>Toda transição precisa estar prevista na régua e partir da etapa atual.</li>
+          <li>Retorno e salto exigem motivo. Um retorno abre um novo ciclo da etapa, com número incrementado.</li>
+          <li>Salto grava as etapas puladas como <em>dispensadas</em>, para que relatórios não as projetem como pendentes.</li>
+          <li>Dispensar uma etapa dispensa junto as etapas que dependem dela, e só elas.</li>
+          <li>Uma etapa com pré-requisito só recebe o processo se o pré-requisito tiver sido concluído.</li>
+          <li>Só a última transição pode ser desfeita, com motivo, e nunca se já houver movimentação registrada depois dela.</li>
+        </ul>
+
+        <h3>Operação atômica</h3>
+        <p><code>executar()</code> valida tudo antes e devolve um único evento já com as consequências calculadas (por exemplo, a lista de etapas dispensadas). Ou o evento inteiro entra no log, ou nada entra. Num backend real, isso corresponde a uma única transação no banco: fechar o ciclo, gravar as dispensas e abrir o próximo ciclo acontecem juntos ou não acontecem.</p>
+
+        <h3>Validação da régua</h3>
+        <p>Antes de usar um fluxo, o validador procura etapas inalcançáveis, etapas sem saída, ciclos que nunca chegam a uma etapa final, retornos que apontam para frente e transições que usam etapas inexistentes.</p>
+
+        <h3>Tecnologia</h3>
+        <p>Um único arquivo HTML, JavaScript puro e SVG, sem dependências. O motor fica separado da interface e tem autotestes que rodam no navegador, na aba Testes. O estado fica salvo no seu navegador.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span>Motor de Workflow · projeto de portfólio · dados fictícios</span>
+    <span><button class="btn ghost" data-action="reset" type="button">Restaurar exemplo</button></span>
+  </footer>
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlgTitle" id="dialog"></div>
+</div>
+
+<script>
+/* =====================================================================
+   MOTOR — funções puras, sem DOM
+   ===================================================================== */
+const Motor = (() => {
+  const OPS = ['AVANCO', 'RETORNO', 'SALTO', 'DISPENSA'];
+  const OPROT = { AVANCO: 'Avanço', RETORNO: 'Retorno', SALTO: 'Salto', DISPENSA: 'Dispensa' };
+  const FECHA = { AVANCO: 'CONCLUIDA', SALTO: 'CONCLUIDA', RETORNO: 'RETORNADA', DISPENSA: 'DISPENSADA' };
+
+  const etapaMap = r => Object.fromEntries(r.etapas.map(e => [e.codigo, e]));
+  const ordenadas = r => [...r.etapas].sort((a, b) => a.ordem - b.ordem);
+  const inicial = r => ordenadas(r)[0];
+
+  function efetivos(eventos) {
+    const desfeitos = new Set(eventos.filter(e => e.tipo === 'DESFAZER').map(e => e.alvo));
+    return eventos.filter(e => e.tipo !== 'DESFAZER' && !desfeitos.has(e.id));
+  }
+
+  function projetar(regua, eventos) {
+    const m = etapaMap(regua);
+    const ciclos = [];
+    let atual = null, encerrado = false;
+    const aberto = () => ciclos.find(c => c.saida === null) || null;
+    const abrir = (cod, t, ev) => {
+      const n = ciclos.filter(c => c.etapa === cod).length + 1;
+      const c = { etapa: cod, ciclo: n, status: 'EM_ANDAMENTO', entrada: t, saida: null, evento: ev, notas: [] };
+      ciclos.push(c);
+      atual = cod;
+      if (m[cod] && m[cod].final) { c.status = 'CONCLUIDA'; c.saida = t; encerrado = true; }
+    };
+    for (const ev of efetivos(eventos)) {
+      if (ev.tipo === 'CRIAR') abrir(ev.destino, ev.t, ev.id);
+      else if (ev.tipo === 'TRANSICAO') {
+        const cur = aberto();
+        if (cur) { cur.saida = ev.t; cur.status = FECHA[ev.operacao]; }
+        for (const cod of ev.dispensadas || []) {
+          ciclos.push({ etapa: cod, ciclo: ciclos.filter(c => c.etapa === cod).length + 1, status: 'DISPENSADA', entrada: ev.t, saida: ev.t, evento: ev.id, notas: [], auto: true });
+        }
+        abrir(ev.destino, ev.t, ev.id);
+      } else if (ev.tipo === 'NOTA') {
+        const cur = aberto();
+        if (cur) cur.notas.push(ev);
+      }
+    }
+    return { ciclos, atual, encerrado, aberto: aberto() };
+  }
+
+  /* avalia se a transição pode ocorrer; motivo === null ignora a exigência de motivo (para habilitar botões) */
+  function avaliar(regua, eventos, tr, motivo) {
+    const m = etapaMap(regua);
+    const est = projetar(regua, eventos);
+    if (est.encerrado) return { ok: false, motivo: 'Processo encerrado' };
+    if (tr.origem !== est.atual) return { ok: false, motivo: 'A transição não parte da etapa atual' };
+    if (!regua.transicoes.some(t => t.origem === tr.origem && t.operacao === tr.operacao && t.destino === tr.destino))
+      return { ok: false, motivo: 'Transição não prevista na régua' };
+    const o = m[tr.origem], d = m[tr.destino];
+    if (!o || !d) return { ok: false, motivo: 'Etapa inexistente na régua' };
+    const precisaMotivo = tr.operacao === 'RETORNO' || tr.operacao === 'SALTO';
+    const entre = ordenadas(regua).filter(e => e.ordem > o.ordem && e.ordem < d.ordem);
+    let dispensadas = [];
+    if (tr.operacao === 'SALTO') dispensadas = entre.map(e => e.codigo);
+    if (tr.operacao === 'DISPENSA') {
+      const deps = new Set(regua.dependencias.filter(x => x.dependeDe === o.codigo).map(x => x.etapa));
+      const fora = entre.filter(e => !deps.has(e.codigo));
+      if (fora.length) return { ok: false, motivo: `${fora[0].nome} não depende de ${o.nome}; use salto` };
+      dispensadas = entre.map(e => e.codigo);
+    }
+    for (const p of regua.prerequisitos.filter(p => p.destino === d.codigo)) {
+      const concluida = est.ciclos.some(c => c.etapa === p.requer && c.status === 'CONCLUIDA');
+      const concluiAgora = p.requer === o.codigo && (tr.operacao === 'AVANCO' || tr.operacao === 'SALTO');
+      if (!concluida && !concluiAgora) return { ok: false, motivo: `${d.nome} exige ${(m[p.requer] || {}).nome || p.requer} concluída` };
+    }
+    if (precisaMotivo && motivo !== null && !(motivo || '').trim())
+      return { ok: false, motivo: `Motivo obrigatório para ${OPROT[tr.operacao].toLowerCase()}`, faltaMotivo: true };
+    return { ok: true, dispensadas, precisaMotivo };
+  }
+
+  function executar(regua, eventos, tr, motivo, t, id) {
+    const a = avaliar(regua, eventos, tr, motivo || '');
+    if (!a.ok) return a;
+    const ult = eventos.length ? eventos[eventos.length - 1].t : t;
+    if (t < ult) return { ok: false, motivo: 'O relógio não pode voltar no tempo' };
+    return { ok: true, evento: { id, tipo: 'TRANSICAO', origem: tr.origem, operacao: tr.operacao, destino: tr.destino, motivo: (motivo || '').trim(), dispensadas: a.dispensadas, t } };
+  }
+
+  function criar(regua, t, id) {
+    const ini = inicial(regua);
+    return { id, tipo: 'CRIAR', destino: ini.codigo, t };
+  }
+
+  function nota(regua, eventos, texto, t, id) {
+    const est = projetar(regua, eventos);
+    if (est.encerrado) return { ok: false, motivo: 'Processo encerrado' };
+    if (!(texto || '').trim()) return { ok: false, motivo: 'Descreva a movimentação' };
+    return { ok: true, evento: { id, tipo: 'NOTA', texto: texto.trim(), etapa: est.atual, t } };
+  }
+
+  function podeDesfazer(regua, eventos) {
+    const ef = efetivos(eventos);
+    let iT = -1;
+    for (let i = ef.length - 1; i >= 0; i--) if (ef[i].tipo === 'TRANSICAO') { iT = i; break; }
+    if (iT < 0) return { ok: false, motivo: 'Nenhuma transição para desfazer' };
+    if (ef.slice(iT + 1).some(e => e.tipo === 'NOTA'))
+      return { ok: false, motivo: 'Há movimentação registrada depois da última transição' };
+    return { ok: true, alvo: ef[iT] };
+  }
+
+  function desfazer(regua, eventos, motivo, t, id) {
+    const p = podeDesfazer(regua, eventos);
+    if (!p.ok) return p;
+    if (!(motivo || '').trim()) return { ok: false, motivo: 'Motivo obrigatório para desfazer', faltaMotivo: true };
+    return { ok: true, evento: { id, tipo: 'DESFAZER', alvo: p.alvo.id, motivo: motivo.trim(), t } };
+  }
+
+  function validarRegua(r) {
+    const out = [];
+    const erro = msg => out.push({ nivel: 'erro', msg });
+    const aviso = msg => out.push({ nivel: 'aviso', msg });
+    if (!r.etapas.length) { erro('A régua não tem etapas'); return out; }
+    const m = etapaMap(r);
+    const cods = r.etapas.map(e => e.codigo);
+    cods.filter((c, i) => cods.indexOf(c) !== i).forEach(c => erro(`Código duplicado: ${c}`));
+    const ords = r.etapas.map(e => e.ordem);
+    ords.filter((o, i) => ords.indexOf(o) !== i).forEach(o => aviso(`Ordem repetida: ${o}`));
+    const finais = r.etapas.filter(e => e.final);
+    if (!finais.length) erro('Nenhuma etapa marcada como final');
+    const adj = {};
+    for (const t of r.transicoes) {
+      const o = m[t.origem], d = m[t.destino];
+      if (!o || !d) { erro(`Transição ${t.origem} → ${t.destino} usa etapa inexistente`); continue; }
+      if (t.operacao === 'RETORNO' && d.ordem >= o.ordem) erro(`Retorno ${o.codigo} → ${d.codigo} deveria voltar para uma etapa anterior`);
+      if (t.operacao !== 'RETORNO' && d.ordem <= o.ordem) erro(`${OPROT[t.operacao]} ${o.codigo} → ${d.codigo} deveria seguir para uma etapa posterior`);
+      if (o.final) aviso(`${o.nome} é final, mas tem transição de saída`);
+      (adj[o.codigo] = adj[o.codigo] || []).push(d.codigo);
+    }
+    const alcance = de => {
+      const vis = new Set([de]); const fila = [de];
+      while (fila.length) { const x = fila.shift(); for (const y of adj[x] || []) if (!vis.has(y)) { vis.add(y); fila.push(y); } }
+      return vis;
+    };
+    const ini = inicial(r);
+    const doInicio = alcance(ini.codigo);
+    for (const e of ordenadas(r)) if (!doInicio.has(e.codigo)) aviso(`${e.nome} (${e.codigo}) é inalcançável a partir de ${ini.nome}`);
+    for (const e of ordenadas(r)) {
+      if (e.final) continue;
+      if (!(adj[e.codigo] || []).length) { erro(`${e.nome} (${e.codigo}) não tem saída`); continue; }
+      if (finais.length) {
+        const al = alcance(e.codigo);
+        if (!finais.some(f => al.has(f.codigo))) erro(`${e.nome} (${e.codigo}) está num ciclo sem saída: nunca chega a uma etapa final`);
+      }
+    }
+    for (const d of r.dependencias) if (!m[d.etapa] || !m[d.dependeDe]) aviso(`Dependência ${d.etapa} ← ${d.dependeDe} usa etapa inexistente`);
+    for (const p of r.prerequisitos) if (!m[p.destino] || !m[p.requer]) aviso(`Pré-requisito ${p.destino} exige ${p.requer}: etapa inexistente`);
+    return out;
+  }
+
+  function validarFormato(o) {
+    if (!o || typeof o !== 'object') return 'O JSON precisa ser um objeto';
+    if (!Array.isArray(o.etapas) || !Array.isArray(o.transicoes)) return 'Faltam as listas "etapas" e "transicoes"';
+    for (const e of o.etapas) {
+      if (typeof e.codigo !== 'string' || !e.codigo.trim()) return 'Toda etapa precisa de "codigo" (texto)';
+      if (typeof e.nome !== 'string') return `Etapa ${e.codigo} sem "nome"`;
+      if (typeof e.ordem !== 'number' || !isFinite(e.ordem)) return `Etapa ${e.codigo} sem "ordem" numérica`;
+    }
+    for (const t of o.transicoes) if (!OPS.includes(t.operacao)) return `Operação inválida: ${t.operacao}`;
+    return null;
+  }
+
+  function normalizar(o) {
+    return {
+      etapas: o.etapas.map(e => ({ codigo: e.codigo.trim(), nome: e.nome, ordem: e.ordem, fase: e.fase || '', final: !!e.final })),
+      transicoes: o.transicoes.map(t => ({ origem: t.origem, operacao: t.operacao, destino: t.destino })),
+      dependencias: Array.isArray(o.dependencias) ? o.dependencias.map(d => ({ etapa: d.etapa, dependeDe: d.dependeDe })) : [],
+      prerequisitos: Array.isArray(o.prerequisitos) ? o.prerequisitos.map(p => ({ destino: p.destino, requer: p.requer })) : []
+    };
+  }
+
+  function metricas(regua, processos, agora) {
+    const m = etapaMap(regua);
+    const por = {};
+    for (const e of regua.etapas) por[e.codigo] = { dias: 0, ciclos: 0, abertos: 0, retornos: 0, dispensas: 0, media: 0 };
+    let ativos = 0, encerrados = 0, retornos = 0, dispensas = 0;
+    for (const p of processos) {
+      const est = projetar(regua, p.eventos);
+      est.encerrado ? encerrados++ : ativos++;
+      for (const c of est.ciclos) {
+        const x = por[c.etapa]; if (!x) continue;
+        if (c.status === 'DISPENSADA') { x.dispensas++; dispensas++; continue; }
+        if (m[c.etapa] && m[c.etapa].final) continue;
+        x.dias += (c.saida === null ? agora : c.saida) - c.entrada;
+        x.ciclos++;
+        if (c.saida === null) x.abertos++;
+        if (c.status === 'RETORNADA') { x.retornos++; retornos++; }
+      }
+    }
+    let gargalo = null;
+    for (const [cod, x] of Object.entries(por)) {
+      x.media = x.ciclos ? x.dias / x.ciclos : 0;
+      if (!gargalo || x.media > por[gargalo].media) gargalo = cod;
+    }
+    if (gargalo && por[gargalo].media === 0) gargalo = null;
+    return { por, ativos, encerrados, retornos, dispensas, gargalo };
+  }
+
+  return { OPS, OPROT, etapaMap, ordenadas, inicial, efetivos, projetar, avaliar, executar, criar, nota, podeDesfazer, desfazer, validarRegua, validarFormato, normalizar, metricas };
+})();
+
+/* =====================================================================
+   DADOS DE EXEMPLO
+   ===================================================================== */
+function reguaExemplo() {
+  return {
+    etapas: [
+      { codigo: 'SOL', nome: 'Solicitação', ordem: 1, fase: 'Pedido', final: false },
+      { codigo: 'GES', nome: 'Aprovação do gestor', ordem: 2, fase: 'Pedido', final: false },
+      { codigo: 'FIN', nome: 'Análise financeira', ordem: 3, fase: 'Pedido', final: false },
+      { codigo: 'COT', nome: 'Cotação', ordem: 4, fase: 'Compra', final: false },
+      { codigo: 'DIR', nome: 'Aprovação da diretoria', ordem: 5, fase: 'Compra', final: false },
+      { codigo: 'PAG', nome: 'Pagamento', ordem: 6, fase: 'Compra', final: false },
+      { codigo: 'CON', nome: 'Concluído', ordem: 7, fase: 'Compra', final: true }
+    ],
+    transicoes: [
+      ['SOL', 'AVANCO', 'GES'],
+      ['GES', 'AVANCO', 'FIN'], ['GES', 'RETORNO', 'SOL'], ['GES', 'SALTO', 'PAG'],
+      ['FIN', 'AVANCO', 'COT'], ['FIN', 'SALTO', 'PAG'], ['FIN', 'RETORNO', 'SOL'],
+      ['COT', 'AVANCO', 'DIR'], ['COT', 'DISPENSA', 'PAG'],
+      ['DIR', 'AVANCO', 'PAG'], ['DIR', 'RETORNO', 'COT'],
+      ['PAG', 'AVANCO', 'CON']
+    ].map(([origem, operacao, destino]) => ({ origem, operacao, destino })),
+    dependencias: [{ etapa: 'DIR', dependeDe: 'COT' }],
+    prerequisitos: [{ destino: 'PAG', requer: 'FIN' }, { destino: 'CON', requer: 'PAG' }]
+  };
+}
+
+function construirProcesso(regua, ctx, nome, inicio, passos) {
+  const p = { id: 'p' + (ctx.seq++), nome, eventos: [Motor.criar(regua, inicio, 'ev' + (ctx.seq++))] };
+  let t = inicio;
+  for (const [dias, tipo, a, b] of passos) {
+    t += dias;
+    let r;
+    if (tipo === 'NOTA') r = Motor.nota(regua, p.eventos, a, t, 'ev' + (ctx.seq++));
+    else {
+      const est = Motor.projetar(regua, p.eventos);
+      r = Motor.executar(regua, p.eventos, { origem: est.atual, operacao: tipo, destino: a }, b || '', t, 'ev' + (ctx.seq++));
+    }
+    if (!r.ok) throw new Error('Exemplo inválido: ' + r.motivo);
+    p.eventos.push(r.evento);
+  }
+  return p;
+}
+
+function estadoExemplo() {
+  const regua = reguaExemplo();
+  const ctx = { seq: 1 };
+  const processos = [
+    construirProcesso(regua, ctx, 'Notebooks para a equipe de design', 2, [
+      [3, 'AVANCO', 'GES'], [2, 'AVANCO', 'FIN'], [4, 'AVANCO', 'COT'], [5, 'AVANCO', 'DIR'],
+      [3, 'RETORNO', 'COT', 'Cotações sem prazo de entrega e sem condição de garantia'],
+      [6, 'AVANCO', 'DIR'],
+      [1, 'NOTA', 'Diretoria pediu comparativo de garantia entre os fornecedores']
+    ]),
+    construirProcesso(regua, ctx, 'Reembolso de viagem: evento em São Paulo', 0, [
+      [1, 'AVANCO', 'GES'], [2, 'AVANCO', 'FIN'],
+      [3, 'SALTO', 'PAG', 'Reembolso abaixo de R$ 2.000: dispensa cotação e diretoria'],
+      [2, 'AVANCO', 'CON']
+    ]),
+    construirProcesso(regua, ctx, 'Licenças anuais de software de edição', 12, [
+      [2, 'AVANCO', 'GES'], [1, 'AVANCO', 'FIN'], [3, 'AVANCO', 'COT'],
+      [2, 'DISPENSA', 'PAG'],
+      [4, 'NOTA', 'Aguardando nota fiscal do fornecedor']
+    ])
+  ];
+  return { regua, processos, relogio: 40, seq: ctx.seq, sel: processos[0].id, tab: 'sim' };
+}
+
+/* =====================================================================
+   INTERFACE
+   ===================================================================== */
+const KEY = 'motor-workflow-v1';
+const BASE = new Date(2026, 2, 2); // dia 0 do relógio simulado
+const STROT = { EM_ANDAMENTO: 'Em andamento', CONCLUIDA: 'Concluída', RETORNADA: 'Retornada', DISPENSADA: 'Dispensada' };
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const dataDe = d => { const x = new Date(BASE); x.setDate(x.getDate() + d); return x.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }); };
+const quando = d => `D+${d} · ${dataDe(d)}`;
+const plural = (n, s, p) => `${n} ${n === 1 ? s : p}`;
+
+let S = carregar() || estadoExemplo();
+let opsAtuais = [];
+let flash = { sim: '', regua: '' };
+
+function carregar() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return null;
+    const o = JSON.parse(raw);
+    if (o && o.regua && Array.isArray(o.processos) && typeof o.relogio === 'number' && !Motor.validarFormato(o.regua)) {
+      o.regua = Motor.normalizar(o.regua);
+      return o;
+    }
+  } catch (e) { /* armazenamento indisponível */ }
+  return null;
+}
+function salvar() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* ignora */ } }
+const novoId = pref => pref + (S.seq++);
+const procSel = () => S.processos.find(p => p.id === S.sel) || null;
+const nomeEtapa = cod => (Motor.etapaMap(S.regua)[cod] || {}).nome || cod;
+
+function render() {
+  $('#clockNow').innerHTML = `Dia <b>${S.relogio}</b> · ${dataDe(S.relogio)}`;
+  for (const t of ['sim', 'regua', 'metricas', 'testes', 'sobre']) {
+    $('#tab-' + t).setAttribute('aria-selected', String(S.tab === t));
+    $('#p-' + t).hidden = S.tab !== t;
+  }
+  const issues = Motor.validarRegua(S.regua);
+  const nErr = issues.filter(i => i.nivel === 'erro').length;
+  const cr = $('#cntRegua');
+  cr.textContent = nErr ? `${nErr} erro${nErr > 1 ? 's' : ''}` : 'válida';
+  cr.className = 'cnt ' + (nErr ? 'bad' : 'ok');
+  if (S.tab === 'sim') renderSim();
+  if (S.tab === 'regua') renderRegua(issues);
+  if (S.tab === 'metricas') renderMetricas();
+  if (S.tab === 'testes') renderTestes();
+  salvar();
+}
+
+/* ---------- simulador ---------- */
+function statusProc(est) {
+  if (est.encerrado) return '<span class="chip st-ENCERRADO">Encerrado</span>';
+  return '<span class="chip st-EM_ANDAMENTO">Em andamento</span>';
+}
+
+function renderSim() {
+  const lista = S.processos.map(p => {
+    const est = Motor.projetar(S.regua, p.eventos);
+    const dias = est.aberto ? S.relogio - est.aberto.entrada : 0;
+    return `<button class="pitem" type="button" data-action="sel" data-id="${p.id}" aria-current="${p.id === S.sel}">
+      <span class="nm">${esc(p.nome)}</span>
+      <span class="meta"><span>${esc(est.encerrado ? 'Concluído' : nomeEtapa(est.atual))}</span>${est.encerrado ? statusProc(est) : `<span>${plural(dias, 'dia', 'dias')}</span>`}</span>
+    </button>`;
+  }).join('');
+
+  const p = procSel();
+  let det = '<div class="card empty">Crie ou selecione um processo.</div>';
+  if (p) det = renderDetalhe(p);
+
+  $('#p-sim').innerHTML = `<div class="sim">
+    <aside>
+      <div class="row" style="justify-content:space-between;margin-bottom:12px">
+        <h3 style="margin:0">Processos <span class="muted mono" style="font-size:13px">${S.processos.length}</span></h3>
+        <button class="btn primary" type="button" data-action="novoProc">+ Novo</button>
+      </div>
+      <div class="plist">${lista || '<div class="empty">Nenhum processo.</div>'}</div>
+    </aside>
+    <div>${det}</div>
+  </div>`;
+}
+
+function renderDetalhe(p) {
+  const est = Motor.projetar(S.regua, p.eventos);
+  const etapas = Motor.ordenadas(S.regua);
+  const ultimo = cod => { const cs = est.ciclos.filter(c => c.etapa === cod); return cs[cs.length - 1]; };
+  const jornada = etapas.map(e => {
+    const c = ultimo(e.codigo);
+    const n = est.ciclos.filter(x => x.etapa === e.codigo && x.status !== 'DISPENSADA').length;
+    return `<div class="jstep ${c ? 's-' + c.status : ''} ${est.atual === e.codigo && !est.encerrado ? 'atual' : ''}" title="${esc(e.nome)}${c ? ' · ' + STROT[c.status] : ' · não iniciada'}">
+      <div class="c"><span>${esc(e.codigo)}</span><span>${n > 1 ? n + 'º ciclo' : ''}</span></div>
+      <div class="n">${esc(e.nome)}</div>
+    </div>`;
+  }).join('');
+
+  // operações a partir da etapa atual
+  opsAtuais = est.encerrado ? [] : S.regua.transicoes.filter(t => t.origem === est.atual);
+  const ordemOp = { AVANCO: 0, DISPENSA: 1, SALTO: 2, RETORNO: 3 };
+  opsAtuais.sort((a, b) => ordemOp[a.operacao] - ordemOp[b.operacao]);
+  const botoes = opsAtuais.map((t, i) => {
+    const a = Motor.avaliar(S.regua, p.eventos, t, null);
+    const extra = a.ok && a.dispensadas && a.dispensadas.length ? `<span class="req">dispensa: ${a.dispensadas.map(esc).join(', ')}</span>` : '';
+    return `<button class="opbtn" type="button" data-action="op" data-i="${i}" ${a.ok ? '' : 'disabled'} aria-describedby="why${i}">
+      <span class="t op-${t.operacao}">${Motor.OPROT[t.operacao].toUpperCase()}</span>
+      <span class="d">→ ${esc(nomeEtapa(t.destino))}</span>
+      ${a.ok ? (a.precisaMotivo ? '<span class="req" id="why' + i + '">exige motivo</span>' : '<span class="req" id="why' + i + '"></span>') : `<span class="why" id="why${i}">${esc(a.motivo)}</span>`}
+      ${extra}
+    </button>`;
+  }).join('');
+
+  const pd = Motor.podeDesfazer(S.regua, p.eventos);
+  const diasEtapa = est.aberto ? S.relogio - est.aberto.entrada : 0;
+
+  // auditoria
+  const desfeitoPor = {};
+  p.eventos.forEach((e, i) => { if (e.tipo === 'DESFAZER') desfeitoPor[e.alvo] = i + 1; });
+  const audit = p.eventos.map((e, i) => {
+    let op = '', mov = '', mot = '';
+    if (e.tipo === 'CRIAR') { op = '<span class="chip">CRIAR</span>'; mov = esc(nomeEtapa(e.destino)); }
+    if (e.tipo === 'TRANSICAO') {
+      op = `<span class="chip op-${e.operacao}">${e.operacao}</span>`;
+      mov = `${esc(e.origem)} → ${esc(e.destino)}${e.dispensadas && e.dispensadas.length ? ` <span class="muted">(dispensa ${e.dispensadas.map(esc).join(', ')})</span>` : ''}`;
+      mot = esc(e.motivo);
+    }
+    if (e.tipo === 'NOTA') { op = '<span class="chip muted">MOVIMENTAÇÃO</span>'; mov = esc(e.etapa); mot = esc(e.texto); }
+    if (e.tipo === 'DESFAZER') { const alvo = p.eventos.findIndex(x => x.id === e.alvo) + 1; op = '<span class="chip st-RETORNADA">DESFAZER</span>'; mov = `anula #${alvo}`; mot = esc(e.motivo); }
+    const und = desfeitoPor[e.id];
+    return `<tr class="${und ? 'undone' : ''}"><td class="num">${i + 1}</td><td class="mono" style="white-space:nowrap">${quando(e.t)}</td><td class="op">${op}</td><td>${mov}${und ? ` <span class="muted mono">desfeito em #${und}</span>` : ''}</td><td>${mot}</td></tr>`;
+  }).reverse().join('');
+
+  const ciclos = est.ciclos.map(c => {
+    const fim = c.saida === null ? S.relogio : c.saida;
+    return `<tr><td class="mono">${esc(c.etapa)}</td><td>${esc(nomeEtapa(c.etapa))}</td><td class="num">${c.ciclo}º</td><td><span class="chip st-${c.status}">${STROT[c.status]}</span>${c.auto ? ' <span class="muted mono" style="font-size:11px">auto</span>' : ''}</td><td class="num">${quando(c.entrada)}</td><td class="num">${c.saida === null ? '—' : quando(c.saida)}</td><td class="num">${c.status === 'DISPENSADA' ? '—' : fim - c.entrada}</td><td class="num">${c.notas.length || ''}</td></tr>`;
+  }).join('');
+
+  return `
+  <div class="phead">
+    <div>
+      <h2>${esc(p.nome)}</h2>
+      <div class="mono muted" style="font-size:12.5px">${est.encerrado ? 'Fluxo concluído em ' + quando(est.ciclos[est.ciclos.length - 1].entrada) : `Na etapa <b style="color:var(--paper)">${esc(nomeEtapa(est.atual))}</b> há ${plural(diasEtapa, 'dia', 'dias')} · ${est.aberto ? est.aberto.ciclo + 'º ciclo' : ''}`}</div>
+    </div>
+    ${statusProc(est)}
+  </div>
+
+  <div class="card">
+    <h3>Jornada</h3>
+    <div class="journey">${jornada}</div>
+    <div class="legend"><span><i style="background:var(--ok)"></i>Concluída</span><span><i style="background:var(--flare)"></i>Em andamento</span><span><i style="background:var(--back)"></i>Retornada</span><span><i style="background:var(--warn)"></i>Dispensada</span></div>
+  </div>
+
+  <div class="card">
+    <h3>Operações</h3>
+    ${est.encerrado ? '<div class="empty">Processo encerrado. Nenhuma operação disponível.</div>' : `
+    <label class="f" for="motivo">Motivo (obrigatório para retorno, salto e desfazer)</label>
+    <textarea id="motivo" rows="2" placeholder="Ex.: anexar o comprovante que faltou"></textarea>
+    <div class="ops">${botoes || '<div class="empty">A régua não prevê saída desta etapa.</div>'}</div>`}
+    <div class="msg ${flash.sim.startsWith('✓') ? 'okk' : 'err'}" id="simMsg" role="status">${esc(flash.sim)}</div>
+    <div class="two" style="margin-top:12px">
+      <div>
+        <label class="f" for="notaTxt">Registrar movimentação na etapa atual</label>
+        <div class="row"><input type="text" id="notaTxt" class="grow" placeholder="Ex.: comprovante anexado" ${est.encerrado ? 'disabled' : ''}><button class="btn" type="button" data-action="nota" ${est.encerrado ? 'disabled' : ''}>Registrar</button></div>
+      </div>
+      <div>
+        <span class="f" style="margin-bottom:4px">Desfazer última transição</span>
+        <div class="row"><button class="btn danger" type="button" data-action="desfazer" ${pd.ok ? '' : 'disabled'}>↶ Desfazer ${pd.ok ? (pd.alvo.operacao.toLowerCase() + ' ' + esc(pd.alvo.origem) + ' → ' + esc(pd.alvo.destino)) : ''}</button></div>
+        ${pd.ok ? '<div class="mono muted" style="font-size:11.5px;margin-top:4px">usa o campo Motivo acima</div>' : `<div class="mono" style="font-size:11.5px;margin-top:4px;color:var(--muted)">${esc(pd.motivo)}</div>`}
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Trilha de auditoria <span class="muted mono" style="font-size:12px">${plural(p.eventos.length, 'evento', 'eventos')} · mais recente primeiro</span></h3>
+    <div class="tbl-wrap"><table class="t"><thead><tr><th>#</th><th>Quando</th><th>Operação</th><th>Movimento</th><th>Motivo / texto</th></tr></thead><tbody>${audit}</tbody></table></div>
+  </div>
+
+  <div class="card">
+    <h3>Ciclos de etapa <span class="muted mono" style="font-size:12px">projetados a partir dos eventos</span></h3>
+    <div class="tbl-wrap"><table class="t"><thead><tr><th>Cód.</th><th>Etapa</th><th>Ciclo</th><th>Status</th><th>Entrada</th><th>Saída</th><th>Dias</th><th>Mov.</th></tr></thead><tbody>${ciclos}</tbody></table></div>
+  </div>`;
+}
+
+/* ---------- régua ---------- */
+function grafoSVG(r) {
+  const et = Motor.ordenadas(r);
+  const idx = Object.fromEntries(et.map((e, i) => [e.codigo, i]));
+  const W = 150, NW = 122, NH = 54, PAD = 24;
+  const fwdMax = Math.max(1, ...r.transicoes.filter(t => t.operacao !== 'RETORNO' && idx[t.destino] - idx[t.origem] > 1).map(t => idx[t.destino] - idx[t.origem]));
+  const backMax = Math.max(1, ...r.transicoes.filter(t => t.operacao === 'RETORNO').map(t => idx[t.origem] - idx[t.destino]));
+  const top = 40 + 26 * fwdMax;
+  const width = PAD * 2 + et.length * W - (W - NW);
+  const height = top + NH + 30 + 26 * backMax;
+  const cx = i => PAD + i * W + NW / 2;
+  const cor = { AVANCO: 'var(--muted)', SALTO: 'var(--flare)', DISPENSA: 'var(--warn)', RETORNO: 'var(--back)' };
+  let edges = '';
+  for (const t of r.transicoes) {
+    if (!(t.origem in idx) || !(t.destino in idx)) continue;
+    const a = idx[t.origem], b = idx[t.destino];
+    const span = Math.abs(b - a);
+    const c = cor[t.operacao];
+    if (t.operacao !== 'RETORNO' && b === a + 1) {
+      const x1 = PAD + a * W + NW, x2 = PAD + b * W - 4, y = top + NH / 2;
+      edges += `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="${c}" stroke-width="1.5" marker-end="url(#m-${t.operacao})"/>`;
+    } else if (t.operacao !== 'RETORNO') {
+      const x1 = cx(a) + 10, x2 = cx(b) - 10, y = top, ctrl = top - 26 * span - 8;
+      edges += `<path d="M${x1},${y} C${x1},${ctrl} ${x2},${ctrl} ${x2},${y - 4}" fill="none" stroke="${c}" stroke-width="1.5" marker-end="url(#m-${t.operacao})"/>`;
+      edges += `<text x="${(x1 + x2) / 2}" y="${top - 19.5 * span - 4}" text-anchor="middle" font-size="10" fill="${c}" font-family="JetBrains Mono, monospace">${t.operacao.toLowerCase()}</text>`;
+    } else {
+      const x1 = cx(a) - 10, x2 = cx(b) + 10, y = top + NH, ctrl = y + 26 * span + 8;
+      edges += `<path d="M${x1},${y} C${x1},${ctrl} ${x2},${ctrl} ${x2},${y + 4}" fill="none" stroke="${c}" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#m-RETORNO)"/>`;
+      edges += `<text x="${(x1 + x2) / 2}" y="${y + 19.5 * span + 12}" text-anchor="middle" font-size="10" fill="${c}" font-family="JetBrains Mono, monospace">retorno</text>`;
+    }
+  }
+  const nodes = et.map((e, i) => {
+    const x = PAD + i * W, nm = e.nome.length > 17 ? e.nome.slice(0, 16) + '…' : e.nome;
+    return `<g><title>${esc(e.nome)} · ordem ${e.ordem}${e.fase ? ' · ' + esc(e.fase) : ''}</title>
+      <rect x="${x}" y="${top}" width="${NW}" height="${NH}" rx="8" fill="var(--ink-2)" stroke="${e.final ? 'var(--ok)' : 'var(--line)'}" stroke-width="${e.final ? 2 : 1}"/>
+      ${e.final ? `<rect x="${x + 3}" y="${top + 3}" width="${NW - 6}" height="${NH - 6}" rx="6" fill="none" stroke="var(--ok)" stroke-opacity=".4"/>` : ''}
+      <text x="${x + 10}" y="${top + 20}" font-size="11" fill="var(--flare)" font-family="JetBrains Mono, monospace">${esc(e.codigo)}</text>
+      <text x="${x + NW - 10}" y="${top + 20}" font-size="10" fill="var(--muted)" text-anchor="end" font-family="JetBrains Mono, monospace">${esc(e.fase || '')}</text>
+      <text x="${x + 10}" y="${top + 40}" font-size="12.5" fill="var(--paper)" font-family="IBM Plex Sans, sans-serif" font-weight="600">${esc(nm)}</text></g>`;
+  }).join('');
+  const markers = Object.entries(cor).map(([k, c]) => `<marker id="m-${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="${c}"/></marker>`).join('');
+  return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="Grafo da régua com ${et.length} etapas e ${r.transicoes.length} transições"><defs>${markers}</defs>${edges}${nodes}</svg>`;
+}
+
+function emUso(cod) {
+  return S.processos.some(p => p.eventos.some(e => e.destino === cod || e.origem === cod || e.etapa === cod || (e.dispensadas || []).includes(cod)));
+}
+
+function renderRegua(issues) {
+  const r = S.regua;
+  const et = Motor.ordenadas(r);
+  const opts = (sel) => et.map(e => `<option value="${esc(e.codigo)}" ${sel === e.codigo ? 'selected' : ''}>${esc(e.codigo)} · ${esc(e.nome)}</option>`).join('');
+  const lis = issues.length ? issues.map(i => `<li class="${i.nivel}">${i.nivel === 'erro' ? 'ERRO' : 'AVISO'} · ${esc(i.msg)}</li>`).join('') : '<li class="valid">✓ Régua válida: todas as etapas são alcançáveis e chegam a uma etapa final.</li>';
+  const etRows = et.map(e => `<tr><td class="mono">${esc(e.codigo)}</td><td>${esc(e.nome)}</td><td class="num">${e.ordem}</td><td>${esc(e.fase)}</td>
+    <td><label class="chk"><input type="checkbox" data-action="final" data-cod="${esc(e.codigo)}" ${e.final ? 'checked' : ''}> final</label></td>
+    <td><button class="btn ghost danger" type="button" data-action="rmEtapa" data-cod="${esc(e.codigo)}" aria-label="Remover etapa ${esc(e.nome)}">remover</button></td></tr>`).join('');
+  const trRows = r.transicoes.map((t, i) => `<tr><td class="mono">${esc(t.origem)}</td><td><span class="chip op-${t.operacao}">${t.operacao}</span></td><td class="mono">${esc(t.destino)}</td>
+    <td><button class="btn ghost danger" type="button" data-action="rmTrans" data-i="${i}" aria-label="Remover transição">remover</button></td></tr>`).join('');
+  const depRows = r.dependencias.map((d, i) => `<tr><td>${esc(nomeEtapa(d.etapa))}</td><td class="muted">depende de</td><td>${esc(nomeEtapa(d.dependeDe))}</td><td><button class="btn ghost danger" type="button" data-action="rmDep" data-i="${i}" aria-label="Remover dependência">remover</button></td></tr>`).join('');
+  const preRows = r.prerequisitos.map((p, i) => `<tr><td>${esc(nomeEtapa(p.destino))}</td><td class="muted">exige concluída</td><td>${esc(nomeEtapa(p.requer))}</td><td><button class="btn ghost danger" type="button" data-action="rmPre" data-i="${i}" aria-label="Remover pré-requisito">remover</button></td></tr>`).join('');
+
+  $('#p-regua').innerHTML = `
+  <div class="phead">
+    <div><h2>Régua do fluxo</h2><p class="sub">A régua define etapas, transições e regras. Ela é dado: altere aqui e o simulador passa a obedecer na hora.</p></div>
+    <div class="row"><button class="btn" type="button" data-action="json">Importar / exportar JSON</button></div>
+  </div>
+  <div class="graph">${grafoSVG(r)}</div>
+  <div class="legend"><span><i style="background:var(--muted)"></i>avanço</span><span><i style="background:var(--flare)"></i>salto</span><span><i style="background:var(--warn)"></i>dispensa</span><span><i style="background:var(--back)"></i>retorno</span><span><i style="background:var(--ok)"></i>etapa final</span></div>
+
+  <div class="card" style="margin-top:16px">
+    <h3>Validação</h3>
+    <ul class="issues">${lis}</ul>
+  </div>
+  <div class="msg ${flash.regua.startsWith('✓') ? 'okk' : 'err'}" id="reguaMsg" role="status">${esc(flash.regua)}</div>
+
+  <div class="rgrid">
+    <div class="card">
+      <h3>Etapas</h3>
+      <div class="tbl-wrap"><table class="t"><thead><tr><th>Cód.</th><th>Nome</th><th>Ordem</th><th>Fase</th><th></th><th></th></tr></thead><tbody>${etRows}</tbody></table></div>
+      <div class="addform">
+        <label class="f">Código<input type="text" id="nCod" maxlength="8" placeholder="AUD"></label>
+        <label class="f">Nome<input type="text" id="nNome" class="nm" placeholder="Auditoria fiscal"></label>
+        <label class="f">Ordem<input type="number" id="nOrd" value="${(et.length ? et[et.length - 1].ordem : 0) + 1}"></label>
+        <label class="f">Fase<input type="text" id="nFase" placeholder="Compra"></label>
+        <button class="btn primary" type="button" data-action="addEtapa">Adicionar</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Transições permitidas</h3>
+      <div class="tbl-wrap"><table class="t"><thead><tr><th>Origem</th><th>Operação</th><th>Destino</th><th></th></tr></thead><tbody>${trRows}</tbody></table></div>
+      <div class="addform">
+        <label class="f">Origem<select id="tOri">${opts()}</select></label>
+        <label class="f">Operação<select id="tOp">${Motor.OPS.map(o => `<option>${o}</option>`).join('')}</select></label>
+        <label class="f">Destino<select id="tDes">${opts(et[1] && et[1].codigo)}</select></label>
+        <button class="btn primary" type="button" data-action="addTrans">Adicionar</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Dependências <span class="muted mono" style="font-size:12px">dispensar a base dispensa a dependente</span></h3>
+      <div class="tbl-wrap"><table class="t"><tbody>${depRows || '<tr><td class="empty">Nenhuma dependência.</td></tr>'}</tbody></table></div>
+      <div class="addform">
+        <label class="f">Etapa<select id="dEt">${opts()}</select></label>
+        <label class="f">Depende de<select id="dDe">${opts()}</select></label>
+        <button class="btn primary" type="button" data-action="addDep">Adicionar</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Pré-requisitos <span class="muted mono" style="font-size:12px">bloqueiam a entrada no destino</span></h3>
+      <div class="tbl-wrap"><table class="t"><tbody>${preRows || '<tr><td class="empty">Nenhum pré-requisito.</td></tr>'}</tbody></table></div>
+      <div class="addform">
+        <label class="f">Destino<select id="pDes">${opts()}</select></label>
+        <label class="f">Exige concluída<select id="pReq">${opts()}</select></label>
+        <button class="btn primary" type="button" data-action="addPre">Adicionar</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ---------- métricas ---------- */
+function renderMetricas() {
+  const M = Motor.metricas(S.regua, S.processos, S.relogio);
+  const et = Motor.ordenadas(S.regua).filter(e => !e.final);
+  const max = Math.max(1, ...et.map(e => M.por[e.codigo].media));
+  const passo = max <= 5 ? 1 : max <= 12 ? 2 : max <= 30 ? 5 : 10;
+  const topo = Math.ceil(max / passo) * passo;
+  const LW = 150, RW = 60, BW = 520, RH = 34, H = et.length * RH + 34;
+  const W = LW + BW + RW;
+  const xs = v => LW + (v / topo) * BW;
+  let grid = '';
+  for (let v = 0; v <= topo; v += passo) grid += `<line x1="${xs(v)}" y1="6" x2="${xs(v)}" y2="${H - 24}" stroke="var(--line)" stroke-width="1"/><text x="${xs(v)}" y="${H - 8}" text-anchor="middle" font-size="10.5" fill="var(--muted)" font-family="JetBrains Mono, monospace">${v}</text>`;
+  const bars = et.map((e, i) => {
+    const x = M.por[e.codigo]; const y = 8 + i * RH; const g = e.codigo === M.gargalo;
+    return `<g><title>${esc(e.nome)}: média de ${x.media.toFixed(1)} dias em ${plural(x.ciclos, 'ciclo', 'ciclos')}</title>
+      <text x="${LW - 10}" y="${y + 16}" text-anchor="end" font-size="12.5" fill="${g ? 'var(--paper)' : 'var(--soft)'}" font-family="IBM Plex Sans, sans-serif" ${g ? 'font-weight="600"' : ''}>${esc(e.nome)}</text>
+      <rect x="${LW}" y="${y + 3}" width="${Math.max(0, xs(x.media) - LW)}" height="18" rx="3" fill="${g ? 'var(--flare)' : '#3a4a6b'}"/>
+      <text x="${xs(x.media) + 6}" y="${y + 16}" font-size="11.5" fill="${g ? 'var(--flare)' : 'var(--muted)'}" font-family="JetBrains Mono, monospace">${x.ciclos ? x.media.toFixed(1) : '—'}</text></g>`;
+  }).join('');
+  const rows = et.map(e => { const x = M.por[e.codigo]; return `<tr><td>${esc(e.nome)}</td><td class="num">${x.ciclos}</td><td class="num">${x.dias}</td><td class="num">${x.ciclos ? x.media.toFixed(1) : '—'}</td><td class="num">${x.abertos || ''}</td><td class="num">${x.retornos || ''}</td><td class="num">${x.dispensas || ''}</td></tr>`; }).join('');
+  const g = M.gargalo ? M.por[M.gargalo] : null;
+
+  $('#p-metricas').innerHTML = `
+  <h2>Métricas do fluxo</h2>
+  <p class="sub">Tempo em cada etapa, somando todos os ciclos de todos os processos. Ciclos em andamento contam até o dia atual do relógio simulado (dia ${S.relogio}). Etapas dispensadas não somam tempo.</p>
+  <div class="kpis">
+    <div class="kpi"><div class="k">processos ativos</div><div class="v">${M.ativos}</div></div>
+    <div class="kpi"><div class="k">encerrados</div><div class="v">${M.encerrados}</div></div>
+    <div class="kpi"><div class="k">retornos</div><div class="v">${M.retornos}</div></div>
+    <div class="kpi"><div class="k">etapas dispensadas</div><div class="v">${M.dispensas}</div></div>
+  </div>
+  ${g ? `<div class="gargalo"><b>GARGALO</b><span><strong>${esc(nomeEtapa(M.gargalo))}</strong>: média de ${g.media.toFixed(1)} dias por ciclo${g.abertos ? `, com ${plural(g.abertos, 'processo parado', 'processos parados')} nela agora` : ''}.</span></div>` : ''}
+  <div class="card">
+    <h3>Média de dias por ciclo, por etapa</h3>
+    <div class="tbl-wrap"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Gráfico de barras da média de dias por etapa">${grid}${bars}</svg></div>
+  </div>
+  <div class="card">
+    <h3>Detalhe por etapa</h3>
+    <div class="tbl-wrap"><table class="t"><thead><tr><th>Etapa</th><th>Ciclos</th><th>Dias totais</th><th>Média</th><th>Abertos</th><th>Retornos</th><th>Dispensas</th></tr></thead><tbody>${rows}</tbody></table></div>
+  </div>`;
+}
+
+/* ---------- testes ---------- */
+function rodarTestes() {
+  const R = reguaExemplo();
+  const res = [];
+  let n = 0;
+  const id = () => 'x' + (n++);
+  const ok = (c, m) => { if (!c) throw new Error(m || 'condição falsa'); };
+  const teste = (nome, fn) => { try { fn(); res.push({ nome, ok: true }); } catch (e) { res.push({ nome, ok: false, erro: e.message }); } };
+  const novo = () => [Motor.criar(R, 0, id())];
+  const ex = (ev, op, dest, mot, t) => {
+    const est = Motor.projetar(R, ev);
+    const r = Motor.executar(R, ev, { origem: est.atual, operacao: op, destino: dest }, mot || '', t ?? ev[ev.length - 1].t + 1, id());
+    if (!r.ok) throw new Error(r.motivo); return [...ev, r.evento];
+  };
+  const tenta = (ev, op, dest, mot) => { const est = Motor.projetar(R, ev); return Motor.executar(R, ev, { origem: est.atual, operacao: op, destino: dest }, mot || '', ev[ev.length - 1].t + 1, id()); };
+  const ciclosDe = (ev, cod) => Motor.projetar(R, ev).ciclos.filter(c => c.etapa === cod);
+
+  teste('Criar abre o 1º ciclo na etapa inicial', () => { const e = Motor.projetar(R, novo()); ok(e.atual === 'SOL' && e.ciclos.length === 1 && e.ciclos[0].status === 'EM_ANDAMENTO'); });
+  teste('Avanço conclui o ciclo atual e abre o próximo', () => { const ev = ex(novo(), 'AVANCO', 'GES'); ok(ciclosDe(ev, 'SOL')[0].status === 'CONCLUIDA'); ok(Motor.projetar(R, ev).atual === 'GES'); });
+  const ateFin = () => ex(ex(novo(), 'AVANCO', 'GES'), 'AVANCO', 'FIN');
+  teste('Só existe um ciclo em andamento', () => { const ev = ex(ateFin(), 'RETORNO', 'SOL', 'ajuste'); ok(Motor.projetar(R, ev).ciclos.filter(c => c.saida === null).length === 1); });
+  teste('Retorno exige motivo', () => { ok(!tenta(ateFin(), 'RETORNO', 'SOL', '').ok); });
+  teste('Retorno abre novo ciclo com número incrementado', () => { const ev = ex(ateFin(), 'RETORNO', 'SOL', 'ajuste'); const sol = ciclosDe(ev, 'SOL'); ok(sol.length === 2 && sol[1].ciclo === 2, 'esperava 2º ciclo'); ok(ciclosDe(ev, 'FIN')[0].status === 'RETORNADA'); });
+  teste('Salto exige motivo', () => { ok(!tenta(ateFin(), 'SALTO', 'PAG', '').ok); });
+  teste('Salto grava DISPENSADA nas etapas puladas', () => { const ev = ex(ateFin(), 'SALTO', 'PAG', 'valor baixo'); ok(ciclosDe(ev, 'COT')[0].status === 'DISPENSADA' && ciclosDe(ev, 'DIR')[0].status === 'DISPENSADA'); });
+  teste('Dispensa leva junto a etapa dependente', () => { const ev = ex(ex(ateFin(), 'AVANCO', 'COT'), 'DISPENSA', 'PAG'); ok(ciclosDe(ev, 'COT')[0].status === 'DISPENSADA'); const d = ciclosDe(ev, 'DIR'); ok(d.length === 1 && d[0].status === 'DISPENSADA' && d[0].auto); });
+  teste('Pré-requisito bloqueia o destino', () => { const ev = ex(novo(), 'AVANCO', 'GES'); const r = tenta(ev, 'SALTO', 'PAG', 'urgente'); ok(!r.ok && /Análise financeira/.test(r.motivo), r.motivo); });
+  teste('Transição fora da régua é recusada', () => { ok(!tenta(novo(), 'AVANCO', 'DIR').ok); });
+  teste('Desfazer restaura o estado anterior', () => { const ev = ex(novo(), 'AVANCO', 'GES'); const d = Motor.desfazer(R, ev, 'erro de lançamento', 2, id()); ok(d.ok); const e = Motor.projetar(R, [...ev, d.evento]); ok(e.atual === 'SOL' && e.ciclos.length === 1 && e.ciclos[0].saida === null); });
+  teste('Desfazer um salto remove as dispensas', () => { const ev = ex(ateFin(), 'SALTO', 'PAG', 'm'); const d = Motor.desfazer(R, ev, 'engano', 9, id()); const e = Motor.projetar(R, [...ev, d.evento]); ok(!e.ciclos.some(c => c.status === 'DISPENSADA') && e.atual === 'FIN'); });
+  teste('Desfazer exige motivo', () => { const ev = ex(novo(), 'AVANCO', 'GES'); ok(!Motor.desfazer(R, ev, ' ', 2, id()).ok); });
+  teste('Movimentação registrada bloqueia o desfazer', () => { const ev = ex(novo(), 'AVANCO', 'GES'); const nt = Motor.nota(R, ev, 'comprovante anexado', 3, id()); ok(!Motor.podeDesfazer(R, [...ev, nt.evento]).ok); });
+  teste('Desfazer não apaga eventos (auditoria imutável)', () => { const ev = ex(novo(), 'AVANCO', 'GES'); const d = Motor.desfazer(R, ev, 'x', 2, id()); const all = [...ev, d.evento]; ok(all.length === 3 && Motor.efetivos(all).length === 1); });
+  teste('Processo encerrado não aceita operação', () => { const ev = ex(ex(ateFin(), 'SALTO', 'PAG', 'm'), 'AVANCO', 'CON'); ok(Motor.projetar(R, ev).encerrado); ok(!Motor.nota(R, ev, 'x', 99, id()).ok); });
+  teste('Relógio não volta no tempo', () => { const ev = [Motor.criar(R, 10, id())]; ok(!Motor.executar(R, ev, { origem: 'SOL', operacao: 'AVANCO', destino: 'GES' }, '', 5, id()).ok); });
+  teste('Validação: régua de exemplo sem erros', () => { ok(Motor.validarRegua(R).filter(i => i.nivel === 'erro').length === 0); });
+  teste('Validação: detecta régua sem etapa final', () => { const r = JSON.parse(JSON.stringify(R)); r.etapas.forEach(e => e.final = false); ok(Motor.validarRegua(r).some(i => /final/.test(i.msg) && i.nivel === 'erro')); });
+  teste('Validação: detecta etapa inalcançável', () => { const r = JSON.parse(JSON.stringify(R)); r.etapas.push({ codigo: 'X', nome: 'Isolada', ordem: 9, fase: '', final: true }); ok(Motor.validarRegua(r).some(i => /inalcançável/.test(i.msg))); });
+  teste('Validação: detecta ciclo sem saída', () => { const r = { etapas: [{ codigo: 'A', nome: 'A', ordem: 1 }, { codigo: 'B', nome: 'B', ordem: 2 }, { codigo: 'C', nome: 'C', ordem: 3, final: true }], transicoes: [{ origem: 'A', operacao: 'AVANCO', destino: 'B' }, { origem: 'B', operacao: 'RETORNO', destino: 'A' }], dependencias: [], prerequisitos: [] }; ok(Motor.validarRegua(r).some(i => /ciclo sem saída/.test(i.msg))); });
+  teste('Validação: retorno para frente é erro', () => { const r = JSON.parse(JSON.stringify(R)); r.transicoes.push({ origem: 'SOL', operacao: 'RETORNO', destino: 'GES' }); ok(Motor.validarRegua(r).some(i => /voltar/.test(i.msg))); });
+  teste('JSON: exportar e importar preserva a régua', () => { const back = Motor.normalizar(JSON.parse(JSON.stringify(R))); ok(!Motor.validarFormato(back) && JSON.stringify(back) === JSON.stringify(Motor.normalizar(R))); });
+  teste('JSON: formato inválido é recusado', () => { ok(Motor.validarFormato({ etapas: [] }) !== null && Motor.validarFormato({ etapas: [], transicoes: [{ operacao: 'PULAR' }] }) !== null); });
+  teste('Métricas somam o tempo por etapa', () => { const ev = ex(novo(), 'AVANCO', 'GES', '', 4); const M = Motor.metricas(R, [{ eventos: ev }], 10); ok(M.por.SOL.dias === 4 && M.por.GES.dias === 6 && M.gargalo === 'GES'); });
+  teste('Dados de exemplo são consistentes', () => { const e = estadoExemplo(); ok(e.processos.length === 3); });
+  return res;
+}
+let resultadosTestes = null;
+function renderTestes() {
+  if (!resultadosTestes) resultadosTestes = rodarTestes();
+  const pass = resultadosTestes.filter(t => t.ok).length;
+  $('#p-testes').innerHTML = `
+  <div class="phead"><div><h2>Autotestes do motor</h2><p class="sub">Os testes rodam no seu navegador contra as funções puras do motor, sem passar pela interface.</p></div>
+  <div class="row"><span class="chip ${pass === resultadosTestes.length ? 'st-CONCLUIDA' : 'st-EM_ANDAMENTO'}" style="font-size:13px;padding:4px 12px">${pass}/${resultadosTestes.length} passaram</span><button class="btn" type="button" data-action="rerun">Rodar de novo</button></div></div>
+  <div class="card"><ul class="tests">${resultadosTestes.map(t => `<li><span class="r ${t.ok ? 'pass' : 'fail'}">${t.ok ? 'PASS' : 'FAIL'}</span><span>${esc(t.nome)}${t.erro ? `<span class="err">${esc(t.erro)}</span>` : ''}</span></li>`).join('')}</ul></div>`;
+}
+function atualizarContadorTestes() {
+  if (!resultadosTestes) resultadosTestes = rodarTestes();
+  const pass = resultadosTestes.filter(t => t.ok).length, tot = resultadosTestes.length;
+  const c = $('#cntTestes'); c.textContent = `${pass}/${tot}`; c.className = 'cnt ' + (pass === tot ? 'ok' : 'bad');
+}
+
+/* ---------- diálogos ---------- */
+function abrirDialogo(html, foco) {
+  $('#dialog').innerHTML = html;
+  $('#overlay').hidden = false;
+  const el = foco ? $(foco) : $('#dialog button');
+  if (el) el.focus();
+}
+function fecharDialogo() { $('#overlay').hidden = true; $('#dialog').innerHTML = ''; }
+
+function dlgNovoProc() {
+  abrirDialogo(`<h3 id="dlgTitle">Novo processo</h3>
+    <label class="f" for="npNome">Nome do processo</label>
+    <input type="text" id="npNome" style="width:100%" placeholder="Ex.: Cadeiras para o escritório">
+    <div class="msg err" id="npMsg"></div>
+    <p class="muted" style="font-size:13px;margin:6px 0 0">Começa em ${esc(Motor.inicial(S.regua).nome)} no dia ${S.relogio}.</p>
+    <div class="acts"><button class="btn" type="button" data-action="fechar">Cancelar</button><button class="btn primary" type="button" data-action="criarProc">Criar processo</button></div>`, '#npNome');
+}
+
+function dlgJson() {
+  const json = JSON.stringify(S.regua, null, 2);
+  abrirDialogo(`<h3 id="dlgTitle">Importar / exportar régua</h3>
+    <p class="muted" style="font-size:13px;margin:0 0 10px">Copie o JSON para guardar a régua, ou cole outro e importe.</p>
+    <label class="f" for="jsonTxt">JSON da régua</label>
+    <textarea id="jsonTxt" spellcheck="false">${esc(json)}</textarea>
+    <div class="msg" id="jsonMsg" role="status"></div>
+    <div class="acts"><button class="btn" type="button" data-action="fechar">Fechar</button><button class="btn" type="button" data-action="copiar">Copiar</button><button class="btn primary" type="button" data-action="importar">Importar</button></div>`, '#jsonTxt');
+}
+
+function dlgConfirmarImport(nova) {
+  abrirDialogo(`<h3 id="dlgTitle">Importar régua incompatível?</h3>
+    <p style="color:var(--soft)">A régua nova não tem todas as etapas usadas pelos processos atuais. Para importar, os processos do simulador serão apagados.</p>
+    <div class="acts"><button class="btn" type="button" data-action="fechar">Cancelar</button><button class="btn primary" type="button" data-action="importarForcado">Importar e apagar processos</button></div>`);
+  pendenteImport = nova;
+}
+let pendenteImport = null;
+
+/* ---------- ações ---------- */
+function setFlash(k, m) { flash[k] = m; }
+
+function acao(btn) {
+  const a = btn.dataset.action;
+  const p = procSel();
+  switch (a) {
+    case 'tab': S.tab = btn.dataset.tab; setFlash('sim', ''); setFlash('regua', ''); render(); $('#tab-' + S.tab).focus(); break;
+    case 'clock': S.relogio += Number(btn.dataset.dias); setFlash('sim', ''); render(); break;
+    case 'clockN': { const n = Math.floor(Number($('#clockN').value)); if (n >= 1 && n <= 365) { S.relogio += n; setFlash('sim', ''); render(); } break; }
+    case 'sel': S.sel = btn.dataset.id; setFlash('sim', ''); render(); break;
+    case 'novoProc': dlgNovoProc(); break;
+    case 'criarProc': {
+      const nome = $('#npNome').value.trim();
+      if (!nome) { $('#npMsg').textContent = 'Dê um nome ao processo.'; return; }
+      const np = { id: novoId('p'), nome, eventos: [Motor.criar(S.regua, S.relogio, novoId('ev'))] };
+      S.processos.unshift(np); S.sel = np.id; setFlash('sim', `✓ Processo criado em ${Motor.inicial(S.regua).nome}.`); fecharDialogo(); render(); break;
+    }
+    case 'op': {
+      const t = opsAtuais[Number(btn.dataset.i)]; if (!t || !p) return;
+      const motivo = ($('#motivo') || {}).value || '';
+      const r = Motor.executar(S.regua, p.eventos, t, motivo, S.relogio, novoId('ev'));
+      if (!r.ok) { setFlash('sim', r.motivo); render(); if (r.faltaMotivo) $('#motivo').focus(); return; }
+      p.eventos.push(r.evento);
+      setFlash('sim', `✓ ${Motor.OPROT[t.operacao]} para ${nomeEtapa(t.destino)} registrado.${r.evento.dispensadas.length ? ' Dispensadas: ' + r.evento.dispensadas.join(', ') + '.' : ''}`);
+      render(); break;
+    }
+    case 'nota': {
+      if (!p) return;
+      const r = Motor.nota(S.regua, p.eventos, $('#notaTxt').value, S.relogio, novoId('ev'));
+      if (!r.ok) { setFlash('sim', r.motivo); render(); return; }
+      p.eventos.push(r.evento); setFlash('sim', '✓ Movimentação registrada.'); render(); break;
+    }
+    case 'desfazer': {
+      if (!p) return;
+      const motivo = ($('#motivo') || {}).value || '';
+      const r = Motor.desfazer(S.regua, p.eventos, motivo, S.relogio, novoId('ev'));
+      if (!r.ok) { setFlash('sim', r.motivo); render(); if (r.faltaMotivo && $('#motivo')) $('#motivo').focus(); return; }
+      p.eventos.push(r.evento); setFlash('sim', '✓ Última transição desfeita. O evento continua na auditoria.'); render(); break;
+    }
+    case 'addEtapa': {
+      const cod = $('#nCod').value.trim().toUpperCase(), nome = $('#nNome').value.trim(), ord = Number($('#nOrd').value), fase = $('#nFase').value.trim();
+      if (!cod || !nome) { setFlash('regua', 'Informe código e nome da etapa.'); render(); return; }
+      if (S.regua.etapas.some(e => e.codigo === cod)) { setFlash('regua', `Já existe uma etapa ${cod}.`); render(); return; }
+      if (!isFinite(ord)) { setFlash('regua', 'A ordem precisa ser um número.'); render(); return; }
+      S.regua.etapas.push({ codigo: cod, nome, ordem: ord, fase, final: false });
+      setFlash('regua', `✓ Etapa ${cod} adicionada. Crie transições para ligá-la ao fluxo.`); render(); break;
+    }
+    case 'rmEtapa': {
+      const cod = btn.dataset.cod;
+      if (emUso(cod)) { setFlash('regua', `${nomeEtapa(cod)} já foi usada por processos e não pode ser removida.`); render(); return; }
+      if (S.regua.etapas.length === 1) { setFlash('regua', 'A régua precisa de ao menos uma etapa.'); render(); return; }
+      const r = S.regua;
+      r.etapas = r.etapas.filter(e => e.codigo !== cod);
+      r.transicoes = r.transicoes.filter(t => t.origem !== cod && t.destino !== cod);
+      r.dependencias = r.dependencias.filter(d => d.etapa !== cod && d.dependeDe !== cod);
+      r.prerequisitos = r.prerequisitos.filter(x => x.destino !== cod && x.requer !== cod);
+      setFlash('regua', `✓ Etapa ${cod} removida com suas transições e regras.`); render(); break;
+    }
+    case 'addTrans': {
+      const t = { origem: $('#tOri').value, operacao: $('#tOp').value, destino: $('#tDes').value };
+      if (t.origem === t.destino) { setFlash('regua', 'Origem e destino precisam ser diferentes.'); render(); return; }
+      if (S.regua.transicoes.some(x => x.origem === t.origem && x.operacao === t.operacao && x.destino === t.destino)) { setFlash('regua', 'Essa transição já existe.'); render(); return; }
+      S.regua.transicoes.push(t); setFlash('regua', `✓ Transição ${t.origem} → ${t.destino} adicionada.`); render(); break;
+    }
+    case 'rmTrans': S.regua.transicoes.splice(Number(btn.dataset.i), 1); setFlash('regua', '✓ Transição removida.'); render(); break;
+    case 'addDep': {
+      const d = { etapa: $('#dEt').value, dependeDe: $('#dDe').value };
+      if (d.etapa === d.dependeDe) { setFlash('regua', 'Uma etapa não pode depender de si mesma.'); render(); return; }
+      if (S.regua.dependencias.some(x => x.etapa === d.etapa && x.dependeDe === d.dependeDe)) { setFlash('regua', 'Essa dependência já existe.'); render(); return; }
+      S.regua.dependencias.push(d); setFlash('regua', '✓ Dependência adicionada.'); render(); break;
+    }
+    case 'rmDep': S.regua.dependencias.splice(Number(btn.dataset.i), 1); setFlash('regua', '✓ Dependência removida.'); render(); break;
+    case 'addPre': {
+      const x = { destino: $('#pDes').value, requer: $('#pReq').value };
+      if (x.destino === x.requer) { setFlash('regua', 'Uma etapa não pode exigir a si mesma.'); render(); return; }
+      if (S.regua.prerequisitos.some(y => y.destino === x.destino && y.requer === x.requer)) { setFlash('regua', 'Esse pré-requisito já existe.'); render(); return; }
+      S.regua.prerequisitos.push(x); setFlash('regua', '✓ Pré-requisito adicionado.'); render(); break;
+    }
+    case 'rmPre': S.regua.prerequisitos.splice(Number(btn.dataset.i), 1); setFlash('regua', '✓ Pré-requisito removido.'); render(); break;
+    case 'json': dlgJson(); break;
+    case 'copiar': {
+      const txt = $('#jsonTxt').value, msg = $('#jsonMsg');
+      try {
+        navigator.clipboard.writeText(txt).then(() => { msg.className = 'msg okk'; msg.textContent = '✓ JSON copiado.'; })
+          .catch(() => { $('#jsonTxt').select(); msg.className = 'msg err'; msg.textContent = 'Não foi possível copiar automaticamente. O texto está selecionado: use Ctrl+C.'; });
+      } catch (e) { $('#jsonTxt').select(); msg.className = 'msg err'; msg.textContent = 'Não foi possível copiar automaticamente. O texto está selecionado: use Ctrl+C.'; }
+      break;
+    }
+    case 'importar': {
+      const msg = $('#jsonMsg');
+      let o;
+      try { o = JSON.parse($('#jsonTxt').value); } catch (e) { msg.className = 'msg err'; msg.textContent = 'JSON inválido: ' + e.message; return; }
+      const f = Motor.validarFormato(o);
+      if (f) { msg.className = 'msg err'; msg.textContent = f; return; }
+      const nova = Motor.normalizar(o);
+      const cods = new Set(nova.etapas.map(e => e.codigo));
+      const usadas = new Set(); S.processos.forEach(p => p.eventos.forEach(e => [e.destino, e.origem, e.etapa, ...(e.dispensadas || [])].forEach(c => c && usadas.add(c))));
+      if ([...usadas].some(c => !cods.has(c))) { dlgConfirmarImport(nova); return; }
+      S.regua = nova; setFlash('regua', '✓ Régua importada.'); fecharDialogo(); render(); break;
+    }
+    case 'importarForcado': if (pendenteImport) { S.regua = pendenteImport; S.processos = []; S.sel = null; pendenteImport = null; setFlash('regua', '✓ Régua importada. Os processos anteriores foram apagados.'); } fecharDialogo(); render(); break;
+    case 'fechar': fecharDialogo(); break;
+    case 'rerun': resultadosTestes = rodarTestes(); atualizarContadorTestes(); render(); break;
+    case 'reset': S = estadoExemplo(); flash = { sim: '✓ Exemplo restaurado.', regua: '' }; render(); break;
+  }
+}
+
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-action]');
+  if (!b || b.disabled) return;
+  if (b.type === 'checkbox') return;
+  acao(b);
+});
+document.addEventListener('change', e => {
+  const c = e.target;
+  if (c.dataset && c.dataset.action === 'final') {
+    const et = S.regua.etapas.find(x => x.codigo === c.dataset.cod);
+    if (et) { et.final = c.checked; setFlash('regua', `✓ ${et.nome} ${c.checked ? 'marcada' : 'desmarcada'} como final.`); render(); }
+  }
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !$('#overlay').hidden) fecharDialogo();
+  if (e.key === 'Enter' && e.target.id === 'npNome') acao({ dataset: { action: 'criarProc' } });
+  if (e.key === 'Enter' && e.target.id === 'notaTxt') acao({ dataset: { action: 'nota' } });
+});
+$('#overlay').addEventListener('click', e => { if (e.target.id === 'overlay') fecharDialogo(); });
+
+atualizarContadorTestes();
+render();
+</script>
+</body>
+</html>

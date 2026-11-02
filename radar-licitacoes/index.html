@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Radar de Licitações</title>
+<meta name="description" content="Painel de editais de licitação com cálculo dos prazos mínimos do art. 55 da Lei 14.133/2021 em dias úteis. Projeto de Thiago Moreira.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Layout: cabeçalho + KPIs + filtros; lista de editais à esquerda, gráfico e agenda à direita; detalhe em drawer */
+  --ink: #0b0f1a;
+  --ink-2: #131a2b;
+  --line: #24304a;
+  --paper: #eef1f7;
+  --muted: #8b96ad;
+  --flare: #ff6b35;
+  --ok: #4fd1a1;
+  --bad: #ff5d73;
+  --warn: #ffc857;
+  --soft: #c9d0de;
+  --display: "Bricolage Grotesque", "Arial Black", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--ink); color: var(--paper); font-family: var(--body); font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+a { color: inherit; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--flare); outline-offset: 2px; border-radius: 4px; }
+.wrap { max-width: 1320px; margin: 0 auto; padding: 0 clamp(16px, 3vw, 32px); }
+.num { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--mono); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* cabeçalho */
+.top { border-bottom: 1px solid var(--line); background: var(--ink); position: sticky; top: 0; z-index: 20; }
+.top .wrap { display: flex; align-items: center; gap: 20px; padding-top: 14px; padding-bottom: 14px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 12px; margin-right: auto; }
+.radar { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); position: relative; overflow: hidden; flex: none;
+  background: radial-gradient(circle, transparent 30%, rgba(255,107,53,.08) 31%, transparent 33%, transparent 62%, rgba(255,107,53,.08) 63%, transparent 65%); }
+.radar::after { content: ""; position: absolute; inset: 0; background: conic-gradient(from 0deg, rgba(255,107,53,.55), transparent 25%); animation: sweep 4s linear infinite; }
+.radar::before { content: ""; position: absolute; width: 5px; height: 5px; border-radius: 50%; background: var(--flare); top: 9px; left: 20px; z-index: 1; }
+@keyframes sweep { to { transform: rotate(360deg); } }
+.brand h1 { font-family: var(--display); font-weight: 800; font-size: 21px; letter-spacing: -.02em; margin: 0; line-height: 1; }
+.brand .by { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-top: 4px; }
+.brand .by a { color: var(--soft); text-decoration: none; border-bottom: 1px dotted var(--muted); }
+.brand .by a:hover { color: var(--flare); }
+.tabs { display: flex; gap: 4px; background: var(--ink-2); border: 1px solid var(--line); border-radius: 8px; padding: 3px; }
+.tabs button { background: none; border: 0; padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; color: var(--muted); }
+.tabs button[aria-selected="true"] { background: var(--line); color: var(--paper); }
+.tabs button:hover { color: var(--paper); }
+
+main { padding: 24px 0 56px; }
+[hidden] { display: none !important; }
+
+/* KPIs */
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.kpi { background: var(--ink); padding: 16px 18px; }
+.kpi .k { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.kpi .v { font-family: var(--display); font-weight: 800; font-size: clamp(24px, 3vw, 32px); letter-spacing: -.02em; margin-top: 4px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.kpi .s { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.kpi.alert .v { color: var(--bad); }
+.kpi.soon .v { color: var(--flare); }
+
+/* filtros */
+.filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin: 20px 0 16px; }
+.field { display: grid; gap: 4px; }
+.field label { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+.field input, .field select { background: var(--ink-2); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; min-height: 38px; }
+.field input[type="search"] { width: 260px; }
+.field select { padding-right: 28px; }
+.check { display: flex; align-items: center; gap: 8px; min-height: 38px; font-size: 14px; color: var(--soft); cursor: pointer; }
+.check input { accent-color: var(--flare); width: 16px; height: 16px; }
+.spacer { flex: 1; }
+.btn { background: var(--ink-2); border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; min-height: 38px; cursor: pointer; font-family: var(--mono); font-size: 13px; }
+.btn:hover { border-color: var(--flare); }
+.btn.primary { background: var(--flare); border-color: var(--flare); color: var(--ink); font-weight: 600; }
+.toast { font-family: var(--mono); font-size: 12px; color: var(--ok); min-height: 18px; }
+
+/* layout principal */
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; align-items: start; }
+.panel { background: var(--ink-2); border: 1px solid var(--line); border-radius: 10px; }
+.panel-h { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.panel-h h2 { font-family: var(--display); font-weight: 600; font-size: 16px; margin: 0; letter-spacing: -.01em; }
+.panel-h .meta { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.side { display: grid; gap: 20px; position: sticky; top: 84px; }
+
+/* lista */
+.head, .row { display: grid; grid-template-columns: 104px minmax(0, 1fr) 36px 76px 124px 96px 120px; gap: 12px; align-items: center; padding: 10px 16px; }
+.head { font-family: var(--mono); font-size: 11.5px; color: var(--muted); border-bottom: 1px solid var(--line); }
+.head button { background: none; border: 0; padding: 0; cursor: pointer; color: inherit; font: inherit; text-align: left; }
+.head button:hover, .head button[aria-sort="ascending"], .head button[aria-sort="descending"] { color: var(--paper); }
+.head .r, .row .r { text-align: right; }
+.rows { list-style: none; margin: 0; padding: 0; }
+.row { width: 100%; background: none; border: 0; border-bottom: 1px solid var(--line); text-align: left; cursor: pointer; transition: background .15s ease; }
+.rows li:last-child .row { border-bottom: 0; }
+.row:hover { background: rgba(255,107,53,.06); }
+.row .id { font-family: var(--mono); font-size: 13px; }
+.row .id small { display: block; color: var(--muted); font-size: 11.5px; }
+.row .obj { font-size: 14.5px; line-height: 1.35; }
+.row .obj small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .uf { font-family: var(--mono); font-size: 13px; }
+.row .mod { font-size: 13px; color: var(--soft); }
+.row .ufmod { display: contents; }
+.row .val { font-family: var(--mono); font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; }
+.row .dt { font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums; }
+.row .dt small { display: block; color: var(--muted); font-size: 11.5px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11.5px; padding: 3px 8px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+.chip::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.chip.ok { color: var(--ok); border-color: rgba(79,209,161,.35); }
+.chip.bad { color: var(--bad); border-color: rgba(255,93,115,.4); }
+.chip.tight { color: var(--warn); border-color: rgba(255,200,87,.4); }
+.empty { padding: 40px 16px; text-align: center; color: var(--muted); }
+
+/* gráfico */
+.seg { display: flex; gap: 2px; background: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 2px; }
+.seg button { background: none; border: 0; padding: 4px 9px; border-radius: 4px; cursor: pointer; font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--line); color: var(--paper); }
+.chart { padding: 12px 16px 16px; }
+.chart svg { width: 100%; height: auto; display: block; }
+.chart text { font-family: var(--mono); font-size: 11px; fill: var(--soft); }
+.chart .lbl { fill: var(--paper); }
+.chart .val { fill: var(--muted); }
+
+/* agenda */
+.agenda { list-style: none; margin: 0; padding: 6px 0; max-height: 420px; overflow: auto; }
+.agenda .day { padding: 10px 16px 4px; font-family: var(--mono); font-size: 11.5px; color: var(--flare); display: flex; justify-content: space-between; }
+.agenda .day span { color: var(--muted); }
+.agenda button { display: grid; grid-template-columns: 1fr auto; gap: 8px; width: 100%; text-align: left; background: none; border: 0; padding: 7px 16px; cursor: pointer; }
+.agenda button:hover { background: rgba(255,107,53,.06); }
+.agenda .t { font-size: 13.5px; line-height: 1.35; }
+.agenda .t small { display: block; color: var(--muted); font-family: var(--mono); font-size: 11.5px; }
+.agenda .flag { font-family: var(--mono); font-size: 11px; color: var(--bad); }
+
+/* drawer */
+.scrim { position: fixed; inset: 0; background: rgba(5,8,15,.6); z-index: 40; opacity: 0; pointer-events: none; transition: opacity .2s ease; }
+.scrim.on { opacity: 1; pointer-events: auto; }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 100%); background: var(--ink-2); border-left: 1px solid var(--line); z-index: 50; transform: translateX(100%); transition: transform .25s ease; display: flex; flex-direction: column; }
+.drawer.on { transform: none; }
+.drawer-h { padding: 18px 22px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 12px; align-items: start; }
+.drawer-h .tag { font-family: var(--mono); font-size: 12px; color: var(--flare); }
+.drawer-h h2 { font-family: var(--display); font-size: 22px; line-height: 1.15; letter-spacing: -.02em; margin: 6px 0 0; text-wrap: balance; }
+.x { background: none; border: 1px solid var(--line); border-radius: 6px; width: 34px; height: 34px; cursor: pointer; flex: none; font-size: 18px; line-height: 1; }
+.x:hover { border-color: var(--flare); }
+.drawer-b { padding: 20px 22px 32px; overflow: auto; display: grid; gap: 22px; }
+.dl { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin: 0; }
+.dl div { background: var(--ink); padding: 10px 12px; }
+.dl dt { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.dl dd { margin: 2px 0 0; font-size: 14px; }
+.calc h3, .drawer-b h3 { font-family: var(--mono); font-size: 11.5px; color: var(--muted); font-weight: 400; text-transform: uppercase; letter-spacing: .08em; margin: 0 0 10px; }
+.verdict { border: 1px solid var(--line); border-radius: 8px; padding: 14px; border-left: 3px solid var(--ok); background: var(--ink); }
+.verdict.bad { border-left-color: var(--bad); }
+.verdict.tight { border-left-color: var(--warn); }
+.verdict strong { font-family: var(--display); font-size: 18px; display: block; margin-bottom: 4px; }
+.verdict p { margin: 0; color: var(--soft); font-size: 14px; }
+.steps { list-style: none; margin: 0; padding: 0; font-family: var(--mono); font-size: 12.5px; display: grid; gap: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.steps li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--ink); }
+.steps li:last-child { border-bottom: 0; }
+.steps li span:first-child { color: var(--muted); }
+.cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal .wd { font-family: var(--mono); font-size: 10.5px; color: var(--muted); text-align: center; }
+.cal .d { font-family: var(--mono); font-size: 11.5px; text-align: center; padding: 6px 0; border-radius: 4px; background: var(--ink); color: var(--muted); border: 1px solid transparent; }
+.cal .d.bd { color: var(--paper); background: rgba(79,209,161,.12); }
+.cal .d.hol { color: var(--warn); background: rgba(255,200,87,.1); }
+.cal .d.pub { border-color: var(--soft); }
+.cal .d.min { border-color: var(--ok); }
+.cal .d.ab { background: var(--flare); color: var(--ink); font-weight: 600; }
+.cal .d.pad { background: none; }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 8px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+
+/* sobre e testes */
+.doc { max-width: 900px; display: grid; gap: 28px; }
+.doc h2 { font-family: var(--display); font-size: clamp(28px, 4vw, 40px); letter-spacing: -.03em; line-height: 1.05; margin: 0; text-wrap: balance; }
+.doc h3 { font-family: var(--display); font-size: 20px; margin: 0 0 8px; letter-spacing: -.01em; }
+.doc p { margin: 0 0 10px; color: var(--soft); max-width: 68ch; }
+.doc code { font-family: var(--mono); font-size: 13px; background: var(--ink-2); border: 1px solid var(--line); padding: 1px 5px; border-radius: 4px; }
+.rules { width: 100%; border-collapse: collapse; font-size: 14px; }
+.rules-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+.rules th, .rules td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.rules th { font-family: var(--mono); font-size: 11.5px; color: var(--muted); font-weight: 400; background: var(--ink-2); }
+.rules tr:last-child td { border-bottom: 0; }
+.rules td.n { font-family: var(--mono); color: var(--flare); white-space: nowrap; }
+.arch { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.arch div { border: 1px solid var(--line); border-radius: 8px; padding: 14px; background: var(--ink-2); }
+.arch b { font-family: var(--mono); font-size: 12.5px; color: var(--flare); font-weight: 600; }
+.arch p { font-size: 14px; margin: 6px 0 0; }
+.note { font-size: 13px; color: var(--muted); border-left: 2px solid var(--line); padding-left: 12px; }
+.tests-sum { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.tests-sum .big { font-family: var(--display); font-size: 28px; font-weight: 800; }
+.tests-sum .big.pass { color: var(--ok); }
+.tests-sum .big.fail { color: var(--bad); }
+.tlist { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.tlist li { display: grid; grid-template-columns: 64px 1fr; gap: 12px; padding: 9px 14px; border-bottom: 1px solid var(--line); font-size: 14px; background: var(--ink-2); }
+.tlist li:last-child { border-bottom: 0; }
+.tlist .st { font-family: var(--mono); font-size: 12px; font-weight: 600; }
+.tlist .st.pass { color: var(--ok); }
+.tlist .st.fail { color: var(--bad); }
+.tlist .err { display: block; font-family: var(--mono); font-size: 12px; color: var(--bad); margin-top: 3px; }
+
+footer { border-top: 1px solid var(--line); padding: 18px 0 28px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+footer .wrap { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+/* responsivo */
+@media (max-width: 1180px) {
+  .layout { grid-template-columns: 1fr; }
+  .side { position: static; grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 980px) {
+  .head { display: none; }
+  .row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "obj chip" "id val" "meta dt"; gap: 6px 12px; padding: 14px 16px; }
+  .row .obj { grid-area: obj; }
+  .row .stc { grid-area: chip; text-align: right; }
+  .row .id { grid-area: id; }
+  .row .val { grid-area: val; }
+  .row .dt { grid-area: dt; text-align: right; }
+  .row .ufmod { grid-area: meta; display: block; }
+  .row .uf, .row .mod { display: inline; }
+  .row .uf::after { content: " · "; color: var(--muted); }
+  .row .id small { display: inline; margin-left: 6px; }
+  .row .dt small { display: inline; margin-left: 6px; }
+  .side { grid-template-columns: 1fr; }
+  .kpis { grid-template-columns: repeat(2, 1fr); }
+  .arch { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .field input[type="search"] { width: 100%; }
+  .filters .field { flex: 1 1 140px; }
+  .filters .field.grow { flex-basis: 100%; }
+  .spacer { display: none; }
+  .tabs { width: 100%; }
+  .tabs button { flex: 1; padding: 7px 6px; }
+  .dl { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <div class="radar" aria-hidden="true"></div>
+      <div>
+        <h1>Radar de Licitações</h1>
+        <div class="by">por Thiago Moreira · <a href="https://github.com/Thiagoo007" target="_blank" rel="noopener">github.com/Thiagoo007</a></div>
+      </div>
+    </div>
+    <div class="tabs" role="tablist" aria-label="Seções">
+      <button role="tab" id="tab-painel" aria-controls="view-painel" aria-selected="true" data-view="painel">Painel</button>
+      <button role="tab" id="tab-sobre" aria-controls="view-sobre" aria-selected="false" data-view="sobre">Sobre o projeto</button>
+      <button role="tab" id="tab-testes" aria-controls="view-testes" aria-selected="false" data-view="testes">Testes</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- PAINEL -->
+  <section id="view-painel" role="tabpanel" aria-labelledby="tab-painel">
+    <div class="kpis" id="kpis"></div>
+
+    <form class="filters" id="filters" onsubmit="return false">
+      <div class="field grow">
+        <label for="f-q">Busca</label>
+        <input type="search" id="f-q" placeholder="Objeto, órgão, número ou UASG" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="f-uf">UF</label>
+        <select id="f-uf"><option value="">Todas</option></select>
+      </div>
+      <div class="field">
+        <label for="f-mod">Modalidade</label>
+        <select id="f-mod">
+          <option value="">Todas</option>
+          <option>Pregão Eletrônico</option>
+          <option>Concorrência Eletrônica</option>
+          <option>Dispensa Eletrônica</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-val">Valor estimado</label>
+        <select id="f-val">
+          <option value="">Qualquer valor</option>
+          <option value="0-100000">Até R$ 100 mil</option>
+          <option value="100000-1000000">R$ 100 mil a R$ 1 mi</option>
+          <option value="1000000-10000000">R$ 1 mi a R$ 10 mi</option>
+          <option value="10000000-">Acima de R$ 10 mi</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-sit">Situação</label>
+        <select id="f-sit">
+          <option value="">Todas</option>
+          <option value="futuro">Abertura futura</option>
+          <option value="hoje">Abre hoje</option>
+          <option value="realizada">Sessão realizada</option>
+        </select>
+      </div>
+      <label class="check"><input type="checkbox" id="f-irr"> Só prazo irregular</label>
+      <div class="spacer"></div>
+      <button type="button" class="btn" id="b-clear">Limpar filtros</button>
+      <button type="button" class="btn" id="b-copy">Copiar CSV</button>
+      <button type="button" class="btn primary" id="b-dl">Baixar CSV</button>
+    </form>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <div class="layout">
+      <div class="panel">
+        <div class="panel-h">
+          <h2>Editais</h2>
+          <span class="meta" id="count"></span>
+        </div>
+        <div class="head" role="presentation">
+          <button data-sort="numero">Número / UASG</button>
+          <button data-sort="objeto">Objeto e órgão</button>
+          <button data-sort="uf">UF</button>
+          <button data-sort="modalidade">Modalidade</button>
+          <button data-sort="valor" class="r">Valor estimado</button>
+          <button data-sort="abertura">Abertura</button>
+          <button data-sort="folga">Prazo art. 55</button>
+        </div>
+        <ul class="rows" id="rows"></ul>
+      </div>
+
+      <aside class="side">
+        <div class="panel">
+          <div class="panel-h">
+            <h2>Distribuição</h2>
+            <div class="seg" role="group" aria-label="Agrupar por">
+              <button type="button" data-group="uf" aria-pressed="true">UF</button>
+              <button type="button" data-group="modalidade" aria-pressed="false">Modalidade</button>
+            </div>
+            <div class="seg" role="group" aria-label="Medida">
+              <button type="button" data-metric="qtd" aria-pressed="true">Qtd.</button>
+              <button type="button" data-metric="valor" aria-pressed="false">R$</button>
+            </div>
+          </div>
+          <div class="chart" id="chart"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-h">
+            <h2>Próximas aberturas</h2>
+            <span class="meta">14 dias</span>
+          </div>
+          <ul class="agenda" id="agenda"></ul>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- SOBRE -->
+  <section id="view-sobre" role="tabpanel" aria-labelledby="tab-sobre" hidden>
+    <div class="doc">
+      <div>
+        <h2>Prazo de edital é regra de negócio, não detalhe de tela</h2>
+        <p style="margin-top:14px">O Radar de Licitações acompanha editais de compras públicas e confere, para cada um, se a data de abertura respeita o prazo mínimo de divulgação exigido pela Lei nº 14.133/2021. O cálculo é feito em dias úteis, descontando fins de semana e feriados nacionais, como manda a lei.</p>
+        <p>Os editais são fictícios, gerados por uma semente determinística a partir da data de hoje. Assim o painel sempre abre com dados atuais e o resultado é reproduzível.</p>
+      </div>
+
+      <div>
+        <h3>Enquadramento no art. 55</h3>
+        <div class="rules-wrap">
+          <table class="rules">
+            <thead><tr><th>Fundamento</th><th>Situação</th><th>Prazo mínimo</th></tr></thead>
+            <tbody>
+              <tr><td class="n">Art. 55, I, a</td><td>Aquisição de bens, menor preço ou maior desconto</td><td class="num">8 dias úteis</td></tr>
+              <tr><td class="n">Art. 55, I, b</td><td>Aquisição de bens, demais critérios</td><td class="num">15 dias úteis</td></tr>
+              <tr><td class="n">Art. 55, II, a</td><td>Serviços comuns e obras ou serviços comuns de engenharia, menor preço ou maior desconto</td><td class="num">10 dias úteis</td></tr>
+              <tr><td class="n">Art. 55, II, b</td><td>Serviços especiais e obras ou serviços especiais de engenharia, menor preço ou maior desconto</td><td class="num">25 dias úteis</td></tr>
+              <tr><td class="n">Art. 55, II, c</td><td>Contratação integrada</td><td class="num">60 dias úteis</td></tr>
+              <tr><td class="n">Art. 55, II, d</td><td>Contratação semi-integrada e demais casos</td><td class="num">35 dias úteis</td></tr>
+              <tr><td class="n">Art. 55, IV</td><td>Técnica e preço ou melhor técnica</td><td class="num">35 dias úteis</td></tr>
+              <tr><td class="n">Art. 75, §3º</td><td>Dispensa eletrônica (aviso de contratação direta)</td><td class="num">3 dias úteis</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div>
+        <h3>Como o prazo é contado</h3>
+        <p>Pelo art. 183, exclui-se o dia do começo e inclui-se o do vencimento, e só contam dias úteis. A data mínima de abertura é o N-ésimo dia útil depois da divulgação. Uma abertura nessa data ou depois é regular; antes dela, é irregular. Com até 2 dias úteis de folga o edital aparece como "no limite", porque qualquer republicação ou ajuste estoura o prazo.</p>
+        <p>Feriados considerados: os nacionais fixos, Sexta-feira Santa e o Dia Nacional de Zumbi e da Consciência Negra (20/11), mais Carnaval e Corpus Christi, que são ponto facultativo sem expediente na administração federal. Os móveis saem do cálculo da Páscoa (algoritmo de Meeus/Jones/Butcher), então funciona para qualquer ano.</p>
+      </div>
+
+      <div>
+        <h3>Arquitetura</h3>
+        <div class="arch">
+          <div><b>calendario</b><p>Páscoa, feriados por ano, teste de dia útil e soma de dias úteis. Funções puras sobre datas ISO, sem fuso horário envolvido.</p></div>
+          <div><b>regras</b><p>Enquadramento no art. 55 e análise do prazo. Recebe um edital e devolve fundamento, data mínima, folga e veredito. Não sabe que existe tela.</p></div>
+          <div><b>ui</b><p>Estado de filtros e ordenação, renderização da lista, gráfico em SVG, agenda e drawer. Só consome o resultado das regras.</p></div>
+        </div>
+        <p class="note" style="margin-top:14px">As regras ficam separadas da interface para poderem ser testadas sozinhas: a aba Testes roda a suíte direto no navegador. O mesmo módulo poderia ir para um backend sem mudar uma linha da lógica.</p>
+      </div>
+
+      <p class="note">Projeto de portfólio. Não substitui análise jurídica: prazos específicos de cada edital, feriados locais e casos de republicação exigem avaliação do agente de contratação.</p>
+    </div>
+  </section>
+
+  <!-- TESTES -->
+  <section id="view-testes" role="tabpanel" aria-labelledby="tab-testes" hidden>
+    <div class="doc">
+      <div>
+        <h2>Suíte de testes das regras</h2>
+        <p style="margin-top:14px">Os testes rodam no seu navegador contra as mesmas funções usadas pelo painel. Também dá para abrir direto com <code>?test</code> no endereço.</p>
+      </div>
+      <div class="tests-sum" id="tests-sum"></div>
+      <ul class="tlist" id="tests"></ul>
+      <div><button type="button" class="btn" id="b-rerun">Rodar de novo</button></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Radar de Licitações · dados fictícios para demonstração</span>
+    <span id="foot-date"></span>
+  </div>
+</footer>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="d-title" aria-hidden="true">
+  <div class="drawer-h">
+    <div>
+      <div class="tag" id="d-tag"></div>
+      <h2 id="d-title"></h2>
+    </div>
+    <button class="x" id="d-close" aria-label="Fechar detalhe">×</button>
+  </div>
+  <div class="drawer-b" id="d-body"></div>
+</aside>
+
+<script>
+"use strict";
+
+/* =====================================================================
+   MÓDULO calendario — funções puras sobre datas ISO (AAAA-MM-DD)
+   ===================================================================== */
+const Calendario = (() => {
+  const pad = n => String(n).padStart(2, "0");
+  const toDate = iso => { const [y, m, d] = iso.split("-").map(Number); return new Date(Date.UTC(y, m - 1, d)); };
+  const toISO = dt => `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`;
+  const addDays = (iso, n) => { const dt = toDate(iso); dt.setUTCDate(dt.getUTCDate() + n); return toISO(dt); };
+  const weekday = iso => toDate(iso).getUTCDay();
+  const diffDays = (a, b) => Math.round((toDate(b) - toDate(a)) / 86400000);
+
+  // Páscoa — algoritmo de Meeus/Jones/Butcher
+  function pascoa(ano) {
+    const a = ano % 19, b = Math.floor(ano / 100), c = ano % 100;
+    const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7;
+    const m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const mes = Math.floor((h + l - 7 * m + 114) / 31), dia = ((h + l - 7 * m + 114) % 31) + 1;
+    return `${ano}-${pad(mes)}-${pad(dia)}`;
+  }
+
+  const cache = new Map();
+  function feriados(ano) {
+    if (cache.has(ano)) return cache.get(ano);
+    const p = pascoa(ano);
+    const lista = [
+      [`${ano}-01-01`, "Confraternização Universal"],
+      [addDays(p, -48), "Carnaval (ponto facultativo)"],
+      [addDays(p, -47), "Carnaval (ponto facultativo)"],
+      [addDays(p, -2), "Sexta-feira Santa"],
+      [`${ano}-04-21`, "Tiradentes"],
+      [`${ano}-05-01`, "Dia do Trabalho"],
+      [addDays(p, 60), "Corpus Christi (ponto facultativo)"],
+      [`${ano}-09-07`, "Independência do Brasil"],
+      [`${ano}-10-12`, "Nossa Senhora Aparecida"],
+      [`${ano}-11-02`, "Finados"],
+      [`${ano}-11-15`, "Proclamação da República"],
+      [`${ano}-11-20`, "Zumbi e Consciência Negra"],
+      [`${ano}-12-25`, "Natal"]
+    ];
+    const mapa = new Map(lista);
+    cache.set(ano, mapa);
+    return mapa;
+  }
+  const feriado = iso => feriados(Number(iso.slice(0, 4))).get(iso) || null;
+  const diaUtil = iso => { const w = weekday(iso); return w !== 0 && w !== 6 && !feriado(iso); };
+
+  // Soma n dias úteis excluindo o dia inicial (art. 183)
+  function somaDiasUteis(iso, n) {
+    let atual = iso, cont = 0;
+    if (n <= 0) return iso;
+    while (cont < n) { atual = addDays(atual, 1); if (diaUtil(atual)) cont++; }
+    return atual;
+  }
+  // Dias úteis no intervalo (a, b]
+  function diasUteisEntre(a, b) {
+    if (b <= a) return 0;
+    let n = 0, atual = a;
+    while (atual < b) { atual = addDays(atual, 1); if (diaUtil(atual)) n++; }
+    return n;
+  }
+  function proximoDiaUtil(iso) { let x = iso; while (!diaUtil(x)) x = addDays(x, 1); return x; }
+
+  return { toDate, toISO, addDays, weekday, diffDays, pascoa, feriados, feriado, diaUtil, somaDiasUteis, diasUteisEntre, proximoDiaUtil };
+})();
+
+/* =====================================================================
+   MÓDULO regras — enquadramento no art. 55 e análise do prazo
+   ===================================================================== */
+const Regras = (() => {
+  const TIPOS = {
+    bem: "Aquisição de bens",
+    servico_comum: "Serviço comum",
+    servico_especial: "Serviço especial",
+    obra_comum: "Obra/serviço comum de engenharia",
+    obra_especial: "Obra/serviço especial de engenharia",
+    integrada: "Contratação integrada",
+    semi_integrada: "Contratação semi-integrada"
+  };
+  const CRITERIOS = { menor_preco: "Menor preço", maior_desconto: "Maior desconto", tecnica_preco: "Técnica e preço", melhor_tecnica: "Melhor técnica" };
+  const precoOuDesconto = c => c === "menor_preco" || c === "maior_desconto";
+
+  function enquadrar(e) {
+    if (e.modalidade === "Dispensa Eletrônica")
+      return { fundamento: "Art. 75, §3º", dias: 3, descricao: "Aviso de dispensa eletrônica divulgado por no mínimo 3 dias úteis" };
+    if (e.criterio === "tecnica_preco" || e.criterio === "melhor_tecnica")
+      return { fundamento: "Art. 55, IV", dias: 35, descricao: "Julgamento por técnica e preço ou melhor técnica" };
+    switch (e.tipo) {
+      case "bem":
+        return precoOuDesconto(e.criterio)
+          ? { fundamento: "Art. 55, I, a", dias: 8, descricao: "Aquisição de bens por menor preço ou maior desconto" }
+          : { fundamento: "Art. 55, I, b", dias: 15, descricao: "Aquisição de bens, demais critérios" };
+      case "servico_comum":
+      case "obra_comum":
+        if (precoOuDesconto(e.criterio))
+          return { fundamento: "Art. 55, II, a", dias: 10, descricao: "Serviço comum ou obra/serviço comum de engenharia, menor preço ou maior desconto" };
+        break;
+      case "servico_especial":
+      case "obra_especial":
+        if (precoOuDesconto(e.criterio))
+          return { fundamento: "Art. 55, II, b", dias: 25, descricao: "Serviço especial ou obra/serviço especial de engenharia, menor preço ou maior desconto" };
+        break;
+      case "integrada":
+        return { fundamento: "Art. 55, II, c", dias: 60, descricao: "Regime de contratação integrada" };
+    }
+    return { fundamento: "Art. 55, II, d", dias: 35, descricao: "Contratação semi-integrada ou hipótese não abrangida nas alíneas anteriores" };
+  }
+
+  const LIMITE_APERTADO = 2;
+  function analisarPrazo(e) {
+    const regra = enquadrar(e);
+    const dataMinima = Calendario.somaDiasUteis(e.publicacao, regra.dias);
+    const regular = e.abertura >= dataMinima;
+    const folga = regular
+      ? Calendario.diasUteisEntre(dataMinima, e.abertura)
+      : -Calendario.diasUteisEntre(e.abertura, dataMinima);
+    const concedidos = Calendario.diasUteisEntre(e.publicacao, e.abertura);
+    const status = !regular ? "irregular" : folga <= LIMITE_APERTADO ? "limite" : "regular";
+    return { ...regra, dataMinima, regular, folga, concedidos, status };
+  }
+
+  return { TIPOS, CRITERIOS, enquadrar, analisarPrazo, LIMITE_APERTADO };
+})();
+
+/* =====================================================================
+   MÓDULO dados — geração determinística dos editais
+   ===================================================================== */
+const Dados = (() => {
+  function mulberry32(seed) {
+    return function () {
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  const ORGAOS = [
+    ["DNIT — Departamento Nacional de Infraestrutura de Transportes", "39"],
+    ["Ministério da Saúde", "25"],
+    ["INSS — Instituto Nacional do Seguro Social", "51"],
+    ["IBAMA", "19"],
+    ["Polícia Federal", "20"],
+    ["Receita Federal do Brasil", "17"],
+    ["Fundação Oswaldo Cruz", "25"],
+    ["Universidade de Brasília", "15"],
+    ["Universidade Federal de Minas Gerais", "15"],
+    ["EBSERH — Empresa Brasileira de Serviços Hospitalares", "15"],
+    ["ICMBio", "44"],
+    ["Comando do Exército", "16"],
+    ["ANVISA", "25"],
+    ["Instituto Federal de Brasília", "15"]
+  ];
+  const UFS = ["DF", "SP", "MG", "RJ", "BA", "GO", "PR", "RS", "PE", "PA", "AM", "TO", "MT", "SC", "CE", "RO", "MA", "ES"];
+  const CATALOGO = [
+    { tipo: "bem", peso: 6, faixa: [18000, 2800000], objetos: [
+      "Aquisição de notebooks para unidades regionais",
+      "Aquisição de mobiliário corporativo para sede administrativa",
+      "Aquisição de medicamentos de uso hospitalar",
+      "Aquisição de pneus e câmaras para a frota oficial",
+      "Aquisição de equipamentos de proteção individual",
+      "Aquisição de reagentes para laboratório de análises",
+      "Aquisição de material de expediente",
+      "Aquisição de switches e pontos de acesso de rede" ] },
+    { tipo: "servico_comum", peso: 5, faixa: [40000, 9500000], objetos: [
+      "Serviços de limpeza, asseio e conservação predial",
+      "Serviços de vigilância patrimonial armada e desarmada",
+      "Outsourcing de impressão com fornecimento de suprimentos",
+      "Manutenção predial preventiva e corretiva",
+      "Locação de veículos com motorista para apoio operacional",
+      "Serviço de recepção e secretariado" ] },
+    { tipo: "servico_especial", peso: 1, faixa: [600000, 6000000], objetos: [
+      "Consultoria especializada em modelagem de processos de trabalho",
+      "Auditoria independente das demonstrações contábeis" ] },
+    { tipo: "obra_comum", peso: 3, faixa: [900000, 38000000], objetos: [
+      "Conservação rodoviária da BR-020/DF",
+      "Recuperação de pavimento da BR-153/GO",
+      "Reforma da cobertura do bloco administrativo",
+      "Sinalização horizontal e vertical da BR-116/RS" ] },
+    { tipo: "obra_especial", peso: 2, faixa: [25000000, 180000000], objetos: [
+      "Construção de ponte sobre o rio Tocantins na BR-230/TO",
+      "Restauração com melhoria da BR-364/RO",
+      "Contenção de encosta na BR-101/SC" ] },
+    { tipo: "integrada", peso: 1, faixa: [150000000, 620000000], objetos: [
+      "Projetos e obras de duplicação da BR-116/BA",
+      "Projetos e implantação de contorno rodoviário na BR-163/MT" ] },
+    { tipo: "semi_integrada", peso: 1, faixa: [80000000, 300000000], objetos: [
+      "Adequação de capacidade da BR-381/MG",
+      "Ampliação de capacidade da BR-040/GO" ] }
+  ];
+  const LIMITE_DISPENSA = 65492.11; // art. 75, II, valor vigente em 2026 (Decreto nº 12.807/2025)
+
+  function gerar(hoje, total = 60, seed = 20260655) {
+    const r = mulberry32(seed);
+    const int = (a, b) => a + Math.floor(r() * (b - a + 1));
+    const pick = arr => arr[Math.floor(r() * arr.length)];
+    const ano = hoje.slice(0, 4);
+    const pesoTotal = CATALOGO.reduce((s, c) => s + c.peso, 0);
+    const pickCat = () => { let x = r() * pesoTotal; for (const c of CATALOGO) { x -= c.peso; if (x < 0) return c; } return CATALOGO[0]; };
+    const usados = new Set();
+    const lista = [];
+    for (let i = 0; i < total; i++) {
+      const cat = pickCat();
+      const [orgao, prefixo] = pick(ORGAOS);
+      let modalidade, criterio, valor;
+      const ehComum = cat.tipo === "bem" || cat.tipo === "servico_comum";
+      if (ehComum && r() < 0.22) {
+        modalidade = "Dispensa Eletrônica"; criterio = "menor_preco";
+        valor = int(4000, Math.floor(LIMITE_DISPENSA) - 1);
+      } else if (ehComum) {
+        modalidade = "Pregão Eletrônico"; criterio = r() < 0.2 ? "maior_desconto" : "menor_preco";
+        valor = int(cat.faixa[0], cat.faixa[1]);
+      } else {
+        modalidade = "Concorrência Eletrônica";
+        criterio = cat.tipo === "servico_especial" && r() < 0.5 ? "tecnica_preco" : "menor_preco";
+        valor = int(cat.faixa[0], cat.faixa[1]);
+      }
+      let numero;
+      do { numero = `90${String(int(1, 999)).padStart(3, "0")}/${ano}`; } while (usados.has(numero));
+      usados.add(numero);
+      const uasg = prefixo + String(int(0, 9999)).padStart(4, "0");
+      const uf = cat.tipo === "obra_comum" || cat.tipo === "obra_especial" || cat.tipo === "integrada" || cat.tipo === "semi_integrada"
+        ? (pick(cat.objetos).match(/\/([A-Z]{2})/) || [])[1] || pick(UFS) : pick(UFS);
+      const objeto = pick(cat.objetos);
+      const ufObj = (objeto.match(/\/([A-Z]{2})$/) || [])[1];
+      const publicacao = Calendario.proximoDiaUtil(Calendario.addDays(hoje, int(-45, 3)));
+      const base = { tipo: cat.tipo, modalidade, criterio, publicacao };
+      const dias = Regras.enquadrar(base).dias;
+      const irregular = r() < 0.12;
+      const abertura = irregular
+        ? Calendario.somaDiasUteis(publicacao, Math.max(1, dias - int(1, 3)))
+        : Calendario.somaDiasUteis(publicacao, dias + int(0, 9));
+      lista.push({
+        id: i + 1, numero, uasg, orgao, objeto, uf: ufObj || uf, tipo: cat.tipo,
+        modalidade, criterio, valor: Math.round(valor * 100) / 100 + (int(0, 99) / 100), publicacao, abertura
+      });
+    }
+    return lista;
+  }
+  return { gerar, mulberry32, LIMITE_DISPENSA };
+})();
+
+/* =====================================================================
+   MÓDULO csv
+   ===================================================================== */
+const CSV = (() => {
+  const esc = v => { const s = String(v ?? ""); return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  function gerar(linhas) {
+    const cab = ["numero", "uasg", "orgao", "objeto", "uf", "modalidade", "criterio", "valor_estimado", "publicacao", "abertura", "fundamento", "dias_uteis_minimos", "data_minima", "folga_dias_uteis", "situacao_prazo"];
+    const corpo = linhas.map(e => [e.numero, e.uasg, e.orgao, e.objeto, e.uf, e.modalidade, Regras.CRITERIOS[e.criterio], e.valor.toFixed(2).replace(".", ","),
+      e.publicacao, e.abertura, e.prazo.fundamento, e.prazo.dias, e.prazo.dataMinima, e.prazo.folga, e.prazo.status].map(esc).join(";"));
+    return [cab.join(";"), ...corpo].join("\r\n");
+  }
+  return { gerar, esc };
+})();
+
+/* =====================================================================
+   MÓDULO testes
+   ===================================================================== */
+const Testes = (() => {
+  const eq = (a, b, msg) => { const A = JSON.stringify(a), B = JSON.stringify(b); if (A !== B) throw new Error(`${msg || "esperado"}: ${B}, obtido ${A}`); };
+  const casos = [
+    ["Páscoa calculada para 2026 e 2027", () => { eq(Calendario.pascoa(2026), "2026-04-05"); eq(Calendario.pascoa(2027), "2027-03-28"); }],
+    ["Feriados móveis de 2026 (Carnaval, Sexta Santa, Corpus Christi)", () => {
+      eq(!!Calendario.feriado("2026-02-17"), true, "Carnaval");
+      eq(!!Calendario.feriado("2026-04-03"), true, "Sexta-feira Santa");
+      eq(!!Calendario.feriado("2026-06-04"), true, "Corpus Christi"); }],
+    ["20/11 é feriado nacional", () => eq(!!Calendario.feriado("2026-11-20"), true)],
+    ["Fim de semana não é dia útil", () => { eq(Calendario.diaUtil("2026-04-04"), false); eq(Calendario.diaUtil("2026-04-06"), true); }],
+    ["Soma de dias úteis pula feriado e fim de semana", () => eq(Calendario.somaDiasUteis("2026-04-01", 2), "2026-04-06")],
+    ["Soma de dias úteis exclui o dia inicial (art. 183)", () => eq(Calendario.somaDiasUteis("2026-05-29", 1), "2026-06-01")],
+    ["Dias úteis no intervalo (a, b]", () => eq(Calendario.diasUteisEntre("2026-04-01", "2026-04-08"), 4)],
+    ["Pregão de bens por menor preço → art. 55, I, a, 8 dias", () => {
+      const r = Regras.enquadrar({ tipo: "bem", modalidade: "Pregão Eletrônico", criterio: "menor_preco" });
+      eq([r.fundamento, r.dias], ["Art. 55, I, a", 8]); }],
+    ["Serviço comum por maior desconto → 10 dias", () => eq(Regras.enquadrar({ tipo: "servico_comum", modalidade: "Pregão Eletrônico", criterio: "maior_desconto" }).dias, 10)],
+    ["Obra especial de engenharia → 25 dias", () => eq(Regras.enquadrar({ tipo: "obra_especial", modalidade: "Concorrência Eletrônica", criterio: "menor_preco" }).dias, 25)],
+    ["Contratação integrada → 60 dias", () => eq(Regras.enquadrar({ tipo: "integrada", modalidade: "Concorrência Eletrônica", criterio: "menor_preco" }).dias, 60)],
+    ["Semi-integrada → 35 dias", () => eq(Regras.enquadrar({ tipo: "semi_integrada", modalidade: "Concorrência Eletrônica", criterio: "menor_preco" }).dias, 35)],
+    ["Técnica e preço → art. 55, IV, 35 dias", () => eq(Regras.enquadrar({ tipo: "servico_especial", modalidade: "Concorrência Eletrônica", criterio: "tecnica_preco" }).fundamento, "Art. 55, IV")],
+    ["Dispensa eletrônica → 3 dias úteis", () => eq(Regras.enquadrar({ tipo: "bem", modalidade: "Dispensa Eletrônica", criterio: "menor_preco" }).dias, 3)],
+    ["Pregão publicado em 01/04/2026 com abertura em 10/04 é irregular, 2 dias úteis antes", () => {
+      const p = Regras.analisarPrazo({ tipo: "bem", modalidade: "Pregão Eletrônico", criterio: "menor_preco", publicacao: "2026-04-01", abertura: "2026-04-10" });
+      eq([p.dataMinima, p.regular, p.folga, p.status], ["2026-04-14", false, -2, "irregular"]); }],
+    ["Abertura exatamente na data mínima é regular, sem folga", () => {
+      const p = Regras.analisarPrazo({ tipo: "bem", modalidade: "Pregão Eletrônico", criterio: "menor_preco", publicacao: "2026-04-01", abertura: "2026-04-14" });
+      eq([p.regular, p.folga, p.status], [true, 0, "limite"]); }],
+    ["Folga acima do limite marca prazo regular", () => {
+      const p = Regras.analisarPrazo({ tipo: "bem", modalidade: "Pregão Eletrônico", criterio: "menor_preco", publicacao: "2026-04-01", abertura: "2026-04-20" });
+      eq([p.folga, p.status], [4, "regular"]); }],
+    ["Geração de dados é determinística", () => eq(Dados.gerar("2026-11-01"), Dados.gerar("2026-11-01"))],
+    ["Geração não repete número de edital", () => { const l = Dados.gerar("2026-11-01"); eq(new Set(l.map(e => e.numero)).size, l.length); }],
+    ["Dispensas respeitam o limite de valor do art. 75, II", () => {
+      const l = Dados.gerar("2026-11-01").filter(e => e.modalidade === "Dispensa Eletrônica");
+      eq(l.every(e => e.valor <= Dados.LIMITE_DISPENSA), true); }],
+    ["CSV escapa ponto e vírgula e aspas", () => eq(CSV.esc('Obra "A"; lote 1'), '"Obra ""A""; lote 1"')]
+  ];
+  function rodar() {
+    return casos.map(([nome, fn]) => { try { fn(); return { nome, ok: true }; } catch (err) { return { nome, ok: false, erro: err.message }; } });
+  }
+  return { rodar };
+})();
+
+/* =====================================================================
+   UI
+   ===================================================================== */
+(() => {
+  const $ = s => document.querySelector(s);
+  const $$ = s => [...document.querySelectorAll(s)];
+  const pad = n => String(n).padStart(2, "0");
+  const agora = new Date();
+  const HOJE = `${agora.getFullYear()}-${pad(agora.getMonth() + 1)}-${pad(agora.getDate())}`;
+  const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+  const BRLc = v => v >= 1e9 ? `R$ ${(v / 1e9).toFixed(2).replace(".", ",")} bi` : v >= 1e6 ? `R$ ${(v / 1e6).toFixed(1).replace(".", ",")} mi` : v >= 1e3 ? `R$ ${Math.round(v / 1e3)} mil` : BRL.format(v);
+  const fmt = iso => { const [y, m, d] = iso.split("-"); return `${d}/${m}/${y}`; };
+  const DIAS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+  const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+  const curto = iso => { const d = Calendario.toDate(iso); return `${DIAS[d.getUTCDay()]}, ${d.getUTCDate()} ${MESES[d.getUTCMonth()]}`; };
+  const escH = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  const EDITAIS = Dados.gerar(HOJE).map(e => {
+    const prazo = Regras.analisarPrazo(e);
+    const situacao = e.abertura < HOJE ? "realizada" : e.abertura === HOJE ? "hoje" : "futuro";
+    return { ...e, prazo, situacao };
+  });
+
+  const state = { q: "", uf: "", mod: "", val: "", sit: "", irr: false, sort: "abertura", dir: 1, group: "uf", metric: "qtd" };
+
+  // UF options
+  [...new Set(EDITAIS.map(e => e.uf))].sort().forEach(uf => { const o = document.createElement("option"); o.value = o.textContent = uf; $("#f-uf").append(o); });
+  $("#foot-date").textContent = `Data de referência: ${fmt(HOJE)}`;
+
+  const norm = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  function filtrados() {
+    const q = norm(state.q.trim());
+    const [vmin, vmax] = state.val ? state.val.split("-").map(x => (x === "" ? Infinity : Number(x))) : [0, Infinity];
+    const list = EDITAIS.filter(e =>
+      (!q || norm(`${e.objeto} ${e.orgao} ${e.numero} ${e.uasg}`).includes(q)) &&
+      (!state.uf || e.uf === state.uf) &&
+      (!state.mod || e.modalidade === state.mod) &&
+      (e.valor >= vmin && e.valor < (vmax || Infinity)) &&
+      (!state.sit || e.situacao === state.sit) &&
+      (!state.irr || !e.prazo.regular));
+    const key = state.sort;
+    const get = e => key === "folga" ? e.prazo.folga : e[key];
+    list.sort((a, b) => { const A = get(a), B = get(b); return (A < B ? -1 : A > B ? 1 : a.id - b.id) * state.dir; });
+    return list;
+  }
+
+  function chip(p) {
+    if (p.status === "irregular") return `<span class="chip bad">${Math.abs(p.folga)} d.u. a menos</span>`;
+    if (p.status === "limite") return `<span class="chip tight">no limite · +${p.folga}</span>`;
+    return `<span class="chip ok">regular · +${p.folga}</span>`;
+  }
+  function relativo(iso) {
+    const d = Calendario.diffDays(HOJE, iso);
+    if (d === 0) return "hoje";
+    if (d === 1) return "amanhã";
+    if (d === -1) return "ontem";
+    return d > 0 ? `em ${d} dias` : `há ${-d} dias`;
+  }
+
+  function renderKPIs(list) {
+    const total = list.reduce((s, e) => s + e.valor, 0);
+    const em7 = list.filter(e => { const d = Calendario.diffDays(HOJE, e.abertura); return d >= 0 && d <= 7; }).length;
+    const irr = list.filter(e => !e.prazo.regular).length;
+    const lim = list.filter(e => e.prazo.status === "limite").length;
+    $("#kpis").innerHTML = `
+      <div class="kpi"><div class="k">editais no filtro</div><div class="v">${list.length}</div><div class="s">de ${EDITAIS.length} monitorados</div></div>
+      <div class="kpi"><div class="k">valor estimado somado</div><div class="v">${BRLc(total)}</div><div class="s">${BRL.format(total)}</div></div>
+      <div class="kpi soon"><div class="k">abrem em até 7 dias</div><div class="v">${em7}</div><div class="s">sessões públicas próximas</div></div>
+      <div class="kpi alert"><div class="k">prazo irregular</div><div class="v">${irr}</div><div class="s">${lim} no limite do art. 55</div></div>`;
+  }
+
+  function renderRows(list) {
+    $("#count").textContent = `${list.length} ${list.length === 1 ? "edital" : "editais"}`;
+    if (!list.length) { $("#rows").innerHTML = `<li class="empty">Nenhum edital com esses filtros. Use "Limpar filtros" para ver todos.</li>`; return; }
+    $("#rows").innerHTML = list.map(e => `
+      <li><button class="row" data-id="${e.id}" aria-label="Abrir edital ${e.numero}">
+        <span class="id">${e.numero}<small>UASG ${e.uasg}</small></span>
+        <span class="obj">${escH(e.objeto)}<small>${escH(e.orgao)}</small></span>
+        <span class="ufmod"><span class="uf">${e.uf}</span><span class="mod">${e.modalidade.replace(" Eletrônica", "").replace(" Eletrônico", "")}</span></span>
+        <span class="val">${BRL.format(e.valor)}</span>
+        <span class="dt">${fmt(e.abertura)}<small>${relativo(e.abertura)}</small></span>
+        <span class="stc">${chip(e.prazo)}</span>
+      </button></li>`).join("");
+  }
+
+  function renderChart(list) {
+    const key = state.group;
+    const agg = new Map();
+    list.forEach(e => {
+      const k = key === "uf" ? e.uf : e.modalidade.replace(" Eletrônica", "").replace(" Eletrônico", "");
+      const cur = agg.get(k) || { qtd: 0, valor: 0, irr: 0 };
+      cur.qtd++; cur.valor += e.valor; if (!e.prazo.regular) cur.irr++;
+      agg.set(k, cur);
+    });
+    const m = state.metric;
+    const itens = [...agg.entries()].sort((a, b) => b[1][m] - a[1][m]).slice(0, 10);
+    if (!itens.length) { $("#chart").innerHTML = `<p class="empty" style="padding:20px 0">Sem dados para o filtro atual.</p>`; return; }
+    const max = Math.max(...itens.map(([, v]) => v[m]));
+    const W = 300, rowH = 24, labelW = key === "uf" ? 32 : 92, valW = 64, barW = W - labelW - valW - 8;
+    const H = itens.length * rowH + 4;
+    const rows = itens.map(([k, v], i) => {
+      const y = i * rowH + 2;
+      const w = Math.max(2, (v[m] / max) * barW);
+      const wIrr = m === "qtd" ? (v.irr / max) * barW : 0;
+      const label = m === "qtd" ? String(v.qtd) : BRLc(v.valor).replace("R$ ", "");
+      return `<g>
+        <text class="lbl" x="0" y="${y + 15}">${escH(k)}</text>
+        <rect x="${labelW}" y="${y + 4}" width="${barW}" height="14" rx="2" fill="var(--ink)"/>
+        <rect x="${labelW}" y="${y + 4}" width="${w}" height="14" rx="2" fill="var(--flare)" opacity=".85"/>
+        ${wIrr ? `<rect x="${labelW}" y="${y + 4}" width="${wIrr}" height="14" rx="2" fill="var(--bad)"/>` : ""}
+        <text class="val" x="${W}" y="${y + 15}" text-anchor="end">${label}</text>
+        <title>${escH(k)}: ${v.qtd} editais, ${BRL.format(v.valor)}${v.irr ? `, ${v.irr} com prazo irregular` : ""}</title>
+      </g>`;
+    }).join("");
+    $("#chart").innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Editais por ${key === "uf" ? "UF" : "modalidade"}">${rows}</svg>
+      ${m === "qtd" ? `<div class="legend"><span><i style="background:var(--flare)"></i>editais</span><span><i style="background:var(--bad)"></i>com prazo irregular</span></div>` : `<div class="legend"><span><i style="background:var(--flare)"></i>valor estimado somado</span></div>`}`;
+  }
+
+  function renderAgenda(list) {
+    const fim = Calendario.addDays(HOJE, 14);
+    const prox = list.filter(e => e.abertura >= HOJE && e.abertura <= fim).sort((a, b) => a.abertura < b.abertura ? -1 : a.abertura > b.abertura ? 1 : a.id - b.id);
+    if (!prox.length) { $("#agenda").innerHTML = `<li class="empty">Nenhuma abertura nos próximos 14 dias para este filtro.</li>`; return; }
+    let html = "", dia = "";
+    prox.forEach(e => {
+      if (e.abertura !== dia) { dia = e.abertura; html += `<li class="day">${curto(dia)}<span>${relativo(dia)}</span></li>`; }
+      html += `<li><button data-id="${e.id}"><span class="t">${escH(e.objeto)}<small>${e.numero} · ${e.uf} · ${BRLc(e.valor)}</small></span>${!e.prazo.regular ? `<span class="flag">irregular</span>` : ""}</button></li>`;
+    });
+    $("#agenda").innerHTML = html;
+  }
+
+  function render() {
+    const list = filtrados();
+    renderKPIs(list); renderRows(list); renderChart(list); renderAgenda(list);
+    $$(".head button").forEach(b => b.setAttribute("aria-sort", b.dataset.sort === state.sort ? (state.dir === 1 ? "ascending" : "descending") : "none"));
+  }
+
+  /* drawer */
+  let ultimoFoco = null;
+  function calendario(e) {
+    const ini = e.publicacao, fim = e.abertura > e.prazo.dataMinima ? e.abertura : e.prazo.dataMinima;
+    let start = ini; while (Calendario.weekday(start) !== 0) start = Calendario.addDays(start, -1);
+    let html = DIAS.map(d => `<div class="wd">${d}</div>`).join("");
+    for (let d = start; d <= fim || Calendario.weekday(d) !== 0; d = Calendario.addDays(d, 1)) {
+      if (d < ini) { html += `<div class="d pad"></div>`; continue; }
+      if (d > fim) { html += `<div class="d pad"></div>`; continue; }
+      const fer = Calendario.feriado(d);
+      const cls = ["d", Calendario.diaUtil(d) && d > ini ? "bd" : "", fer ? "hol" : "", d === ini ? "pub" : "", d === e.prazo.dataMinima ? "min" : "", d === e.abertura ? "ab" : ""].join(" ");
+      html += `<div class="${cls}" title="${fmt(d)}${fer ? " · " + fer : ""}">${Number(d.slice(8))}</div>`;
+    }
+    return html;
+  }
+  function abrir(id) {
+    const e = EDITAIS.find(x => x.id === Number(id)); if (!e) return;
+    const p = e.prazo;
+    const feriadosNoIntervalo = [];
+    for (let d = Calendario.addDays(e.publicacao, 1); d <= (e.abertura > p.dataMinima ? e.abertura : p.dataMinima); d = Calendario.addDays(d, 1)) {
+      const f = Calendario.feriado(d); if (f && Calendario.weekday(d) % 6 !== 0) feriadosNoIntervalo.push(`${fmt(d)} — ${f}`);
+    }
+    const verd = p.status === "irregular"
+      ? { cls: "bad", t: "Prazo irregular", d: `A abertura está ${Math.abs(p.folga)} ${Math.abs(p.folga) === 1 ? "dia útil" : "dias úteis"} antes do mínimo. O edital precisaria ser republicado ou ter a sessão adiada para ${fmt(p.dataMinima)} ou depois.` }
+      : p.status === "limite"
+        ? { cls: "tight", t: "Regular, no limite", d: `Cumpre o prazo com ${p.folga} ${p.folga === 1 ? "dia útil" : "dias úteis"} de folga. Qualquer alteração que exija nova divulgação pode estourar o prazo.` }
+        : { cls: "", t: "Prazo regular", d: `Cumpre o prazo mínimo com ${p.folga} dias úteis de folga.` };
+    $("#d-tag").textContent = `${e.modalidade} ${e.numero} · UASG ${e.uasg}`;
+    $("#d-title").textContent = e.objeto;
+    $("#d-body").innerHTML = `
+      <div class="verdict ${verd.cls}"><strong>${verd.t}</strong><p>${verd.d}</p></div>
+      <dl class="dl">
+        <div><dt>Órgão</dt><dd>${escH(e.orgao)}</dd></div>
+        <div><dt>UF</dt><dd>${e.uf}</dd></div>
+        <div><dt>Enquadramento do objeto</dt><dd>${Regras.TIPOS[e.tipo]}</dd></div>
+        <div><dt>Critério de julgamento</dt><dd>${Regras.CRITERIOS[e.criterio]}</dd></div>
+        <div><dt>Valor estimado</dt><dd class="num">${BRL.format(e.valor)}</dd></div>
+        <div><dt>Situação da sessão</dt><dd>${e.situacao === "realizada" ? "Sessão realizada" : e.situacao === "hoje" ? "Abre hoje" : "Abertura futura"} (${relativo(e.abertura)})</dd></div>
+      </dl>
+      <div class="calc">
+        <h3>Cálculo do prazo</h3>
+        <ol class="steps">
+          <li><span>Fundamento</span><span>${p.fundamento}</span></li>
+          <li><span>Regra</span><span style="text-align:right">${escH(p.descricao)}</span></li>
+          <li><span>Prazo mínimo</span><span>${p.dias} dias úteis</span></li>
+          <li><span>Divulgação do edital</span><span>${fmt(e.publicacao)}</span></li>
+          <li><span>Data mínima de abertura</span><span>${fmt(p.dataMinima)}</span></li>
+          <li><span>Abertura marcada</span><span>${fmt(e.abertura)}</span></li>
+          <li><span>Dias úteis concedidos</span><span>${p.concedidos}</span></li>
+          <li><span>Folga</span><span style="color:${p.folga < 0 ? "var(--bad)" : p.status === "limite" ? "var(--warn)" : "var(--ok)"}">${p.folga > 0 ? "+" : ""}${p.folga} d.u.</span></li>
+        </ol>
+      </div>
+      <div>
+        <h3>Calendário do prazo</h3>
+        <div class="cal">${calendario(e)}</div>
+        <div class="legend">
+          <span><i style="border:1px solid var(--soft)"></i>divulgação</span>
+          <span><i style="background:rgba(79,209,161,.3)"></i>dia útil contado</span>
+          <span><i style="background:rgba(255,200,87,.35)"></i>feriado</span>
+          <span><i style="border:1px solid var(--ok)"></i>data mínima</span>
+          <span><i style="background:var(--flare)"></i>abertura</span>
+        </div>
+        ${feriadosNoIntervalo.length ? `<p class="note" style="margin-top:12px">Feriados no intervalo: ${feriadosNoIntervalo.join("; ")}.</p>` : ""}
+      </div>`;
+    ultimoFoco = document.activeElement;
+    $("#drawer").classList.add("on"); $("#drawer").setAttribute("aria-hidden", "false");
+    $("#scrim").classList.add("on");
+    $("#d-close").focus();
+  }
+  function fechar() {
+    $("#drawer").classList.remove("on"); $("#drawer").setAttribute("aria-hidden", "true");
+    $("#scrim").classList.remove("on");
+    if (ultimoFoco && ultimoFoco.focus) ultimoFoco.focus();
+  }
+
+  /* toast */
+  let tt;
+  function toast(msg, erro) { const el = $("#toast"); el.style.color = erro ? "var(--bad)" : "var(--ok)"; el.textContent = msg; clearTimeout(tt); tt = setTimeout(() => el.textContent = "", 4000); }
+
+  /* eventos */
+  const bind = (sel, key, prop = "value") => $(sel).addEventListener("input", ev => { state[key] = ev.target[prop]; render(); });
+  bind("#f-q", "q"); bind("#f-uf", "uf"); bind("#f-mod", "mod"); bind("#f-val", "val"); bind("#f-sit", "sit"); bind("#f-irr", "irr", "checked");
+  $("#b-clear").addEventListener("click", () => {
+    Object.assign(state, { q: "", uf: "", mod: "", val: "", sit: "", irr: false });
+    ["#f-q", "#f-uf", "#f-mod", "#f-val", "#f-sit"].forEach(s => $(s).value = ""); $("#f-irr").checked = false;
+    render();
+  });
+  $$(".head button").forEach(b => b.addEventListener("click", () => {
+    if (state.sort === b.dataset.sort) state.dir *= -1; else { state.sort = b.dataset.sort; state.dir = b.dataset.sort === "valor" ? -1 : 1; }
+    render();
+  }));
+  $$("[data-group]").forEach(b => b.addEventListener("click", () => { state.group = b.dataset.group; $$("[data-group]").forEach(x => x.setAttribute("aria-pressed", x === b)); renderChart(filtrados()); }));
+  $$("[data-metric]").forEach(b => b.addEventListener("click", () => { state.metric = b.dataset.metric; $$("[data-metric]").forEach(x => x.setAttribute("aria-pressed", x === b)); renderChart(filtrados()); }));
+  document.addEventListener("click", ev => { const t = ev.target.closest("[data-id]"); if (t) abrir(t.dataset.id); });
+  $("#d-close").addEventListener("click", fechar);
+  $("#scrim").addEventListener("click", fechar);
+  document.addEventListener("keydown", ev => { if (ev.key === "Escape" && $("#drawer").classList.contains("on")) fechar(); });
+
+  $("#b-copy").addEventListener("click", async () => {
+    const csv = CSV.gerar(filtrados());
+    try { await navigator.clipboard.writeText(csv); toast(`CSV copiado: ${filtrados().length} editais. Cole numa planilha.`); }
+    catch { toast("O navegador bloqueou a área de transferência. Use Baixar CSV.", true); }
+  });
+  $("#b-dl").addEventListener("click", () => {
+    try {
+      const blob = new Blob(["﻿" + CSV.gerar(filtrados())], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a"); a.href = url; a.download = `radar-licitacoes-${HOJE}.csv`;
+      document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      toast("Download iniciado. Se nada acontecer, use Copiar CSV.");
+    } catch { toast("Download bloqueado neste ambiente. Use Copiar CSV.", true); }
+  });
+
+  /* testes */
+  function renderTestes() {
+    const res = Testes.rodar();
+    const ok = res.filter(r => r.ok).length, falhas = res.length - ok;
+    $("#tests-sum").innerHTML = `<span class="big ${falhas ? "fail" : "pass"}">${ok}/${res.length}</span><span class="mono" style="color:var(--muted)">${falhas ? `${falhas} falharam` : "todos passaram"}</span>`;
+    $("#tests").innerHTML = res.map(r => `<li><span class="st ${r.ok ? "pass" : "fail"}">${r.ok ? "PASS" : "FAIL"}</span><span>${escH(r.nome)}${r.ok ? "" : `<span class="err">${escH(r.erro)}</span>`}</span></li>`).join("");
+    return { ok, falhas };
+  }
+  $("#b-rerun").addEventListener("click", renderTestes);
+
+  /* abas e hash */
+  const VIEWS = ["painel", "sobre", "testes"];
+  function mostrar(v, push) {
+    if (!VIEWS.includes(v)) v = "painel";
+    VIEWS.forEach(x => { $(`#view-${x}`).hidden = x !== v; $(`#tab-${x}`).setAttribute("aria-selected", x === v); });
+    if (v === "testes") renderTestes();
+    if (push) { try { history.replaceState(null, "", v === "painel" ? location.pathname + location.search : `#${v}`); } catch {} }
+  }
+  $$(".tabs button").forEach(b => b.addEventListener("click", () => mostrar(b.dataset.view, true)));
+  window.addEventListener("hashchange", () => mostrar(location.hash.slice(1)));
+
+  render();
+  const inicial = /[?&]test\b/.test(location.search) ? "testes" : location.hash.slice(1);
+  mostrar(inicial || "painel");
+  window.__radar = { renderTestes, EDITAIS };
+})();
+</script>
+</body>
+</html>
