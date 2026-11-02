@@ -218,6 +218,78 @@ h1 .last { display: block; color: transparent; -webkit-text-stroke: 2px var(--pa
 .again { font-family: var(--mono); font-size: 12.5px; color: var(--muted); background: none; border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; cursor: pointer; }
 .again:hover { color: var(--paper); border-color: var(--flare); }
 
+
+/* celular deitado também: cada bloco vira uma tela, e o dedo passa de uma para outra */
+.mob, .mob body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+.mob .viewport { touch-action: none; }
+.mob .chap { display: none; }
+.mob .panel { min-width: 0; padding: 0; gap: 0; align-items: stretch; border: 0; }
+.mob .tl, .mob .sk-col { display: contents; }
+.mob .panel > .col:not(.sk-col), .mob .panel > .st-grid, .mob .tl > .tl-col {
+  flex: 0 0 100vw; width: 100vw !important; height: 100%; padding: calc(var(--top) + 16px) 20px 30px; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y;
+  display: flex; flex-direction: column; justify-content: center; gap: 14px; }
+.mob .panel > .proj, .mob .panel > .ia-main, .mob .sk-col > .sk {
+  flex: 0 0 calc(100vw - 32px); width: calc(100vw - 32px) !important; margin: calc(var(--top) + 14px) 16px 26px; max-height: none; height: auto; align-self: stretch;
+  overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
+.mob .sk-col > .sk { display: flex; flex-direction: column; justify-content: center; align-self: center; height: auto; max-height: calc(100% - var(--top) - 40px); margin-top: calc(var(--top) / 2); margin-bottom: 0; }
+.mob .hero-r { justify-content: center; }
+.mob h1 { font-size: clamp(56px, 18vw, 84px); }
+.mob .lede { font-size: 16px; }
+.mob .ctas .btn { flex: 1 1 140px; justify-content: center; min-height: 46px; }
+.mob .ctas .btn:not(.primary) { background: var(--ink-2); }
+.mob .hero-3d { opacity: .5; }
+.mob .log { font-size: 11px; } .mob .log td { padding: 8px 9px; word-break: break-word; } .mob .log .s { font-size: 10px; }
+.mob .lead { font-size: 26px; }
+.mob .p-sobre .c2 p { font-size: 15.5px; }
+.mob .grid2 { gap: 10px; }
+.mob .f4 .v { font-size: 16px; } .mob .r4 b { font-size: 16px; }
+.mob .tl-col { position: relative; }
+.mob .tl-col::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 2px; background: linear-gradient(90deg, var(--flare), rgba(111,143,232,.6)); }
+.mob .tl-col .job { left: 20px; right: 20px; }
+.mob .proj .shot { max-height: 34%; }
+.mob .proj p { -webkit-line-clamp: 6; }
+.mob .ia-main { padding: 18px; gap: 10px; } .mob .ia-main > p { font-size: 14px; } .mob .ia-list li { padding: 6px 0; font-size: 13px; } .mob .term { font-size: 11px; line-height: 1.7; }
+.mob .ia-main h3 { font-size: 30px; } .mob .ia-list li { grid-template-columns: 1fr; gap: 2px; }
+.mob .st-grid { display: flex; grid-template-columns: none; }
+.mob .st { padding: 14px; gap: 8px; } .mob .st-h p { font-size: 12.5px; }
+.mob .big { font-size: clamp(48px, 15vw, 72px); }
+.mob .links .btn { min-height: 44px; }
+.mob .again { min-height: 44px; }
+.mob .menu-btn { display: flex; }
+.mob .bar nav { display: block; position: fixed; left: 0; right: 0; top: var(--top); background: rgba(11,15,26,.97); border-bottom: 1px solid var(--line);
+  transform: translateY(-8px); opacity: 0; visibility: hidden; transition: opacity .2s, transform .2s, visibility .2s; }
+.mob .bar.open nav { transform: none; opacity: 1; visibility: visible; }
+.mob .bar nav ul { flex-direction: column; gap: 0; padding: 8px 20px 16px; }
+.mob .bar nav a { font-size: 16px; padding: 14px 4px; border-bottom: 1px solid var(--line); border-radius: 0; color: var(--paper); }
+.mob .bar nav a.on { background: none; color: var(--flare); }
+.mob .bar { padding: 0 20px; }
+.mob .hint { left: 20px; right: auto; width: calc(100vw - 40px); justify-content: center; bottom: 18px; }
+.mob .p-hero, .mob .p-contato { width: auto; }
+.mob .hint .mouse { display: none; }
+.mob .hint .t-pc { display: none; } .hint .t-mob { display: none; } .mob .hint .t-mob { display: inline; }
+
+/* (menu) */
+/* menu no celular */
+.menu-btn { display: none; width: 44px; height: 44px; margin-right: -10px; border: 0; background: none; cursor: pointer; flex-direction: column; justify-content: center; align-items: center; gap: 5px; }
+.menu-btn span { display: block; width: 22px; height: 2px; border-radius: 2px; background: var(--paper); transition: transform .25s, opacity .2s; }
+.menu-btn[aria-expanded="true"] span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.menu-btn[aria-expanded="true"] span:nth-child(2) { opacity: 0; }
+.menu-btn[aria-expanded="true"] span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.vert .menu-btn { display: flex; }
+.vert .bar nav { display: block; position: fixed; left: 0; right: 0; top: var(--top); background: rgba(11,15,26,.97); border-bottom: 1px solid var(--line);
+  transform: translateY(-8px); opacity: 0; visibility: hidden; transition: opacity .2s, transform .2s, visibility .2s; }
+.vert .bar.open nav { transform: none; opacity: 1; visibility: visible; }
+.vert .bar nav ul { flex-direction: column; gap: 0; padding: 8px clamp(16px, 5vw, 40px) 16px; }
+.vert .bar nav a { font-size: 16px; padding: 14px 4px; border-bottom: 1px solid var(--line); border-radius: 0; color: var(--paper); }
+.vert .bar nav a.on { background: none; color: var(--flare); }
+.vert .mark { padding: 12px 0; }
+.vert .hero-3d { opacity: .45; }
+.vert .ctas .btn:not(.primary) { background: var(--ink-2); }
+.vert .ctas .btn { flex: 1 1 140px; justify-content: center; min-height: 46px; }
+.vert .proj .links .btn { min-height: 42px; }
+.vert .again { min-height: 44px; }
+
 /* modo vertical: celular, telas baixas, toque ou animação reduzida */
 .vert .viewport { position: static; height: auto; overflow: visible; }
 .vert .bar { position: fixed; }
@@ -236,7 +308,6 @@ h1 .last { display: block; color: transparent; -webkit-text-stroke: 2px var(--pa
 .vert .proj p { -webkit-line-clamp: unset; display: block; }
 .vert .st-grid { grid-template-columns: 1fr; }
 .vert .ghost, .vert .hint { display: none; }
-.vert .bar nav { display: none; }
 .vert .hero-l { flex: none; }
 @media (min-width: 700px) { .vert .st-grid, .vert .grid2-v { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 520px) { .log { font-size: 11px; } .log td { padding: 7px 8px; word-break: break-word; } .log .s { font-size: 10px; } .hero-r { width: 100%; }
@@ -255,6 +326,7 @@ h1 .last { display: block; color: transparent; -webkit-text-stroke: 2px var(--pa
     <li><a href="#stack" data-go="5">stack</a></li>
     <li><a href="#contato" data-go="6">contato</a></li>
   </ul></nav>
+  <button class="menu-btn" id="menuBtn" type="button" aria-expanded="false" aria-controls="navlist"><span></span><span></span><span></span><b class="sr">Menu</b></button>
   <div class="progress" aria-hidden="true"><i id="prog"></i></div>
 </header>
 
@@ -285,7 +357,7 @@ h1 .last { display: block; color: transparent; -webkit-text-stroke: 2px var(--pa
         </tbody></table>
       </div>
     </div>
-    <div class="hint" aria-hidden="true"><span class="mouse"></span>role para avançar <span class="arrow">→</span></div>
+    <div class="hint" aria-hidden="true"><span class="mouse"></span><span class="t-pc">role para avançar</span><span class="t-mob">deslize para avançar</span> <span class="arrow">→</span></div>
   </section>
 
   <!-- 2 -->
@@ -349,7 +421,7 @@ h1 .last { display: block; color: transparent; -webkit-text-stroke: 2px var(--pa
       <div class="pipe" aria-hidden="true"><canvas id="pipe3d"></canvas><div class="pipe-cap"><b>$</b> commit → build → test → deploy → prod</div></div>
     </div>
     <article class="card proj">
-      <a class="shot" href="radar-licitacoes/index.html" tabindex="-1" aria-hidden="true"><img src="shots/radar-licitacoes.jpg" alt="" width="960" height="600" loading="lazy"></a>
+      <a class="shot" href="radar-licitacoes/index.html" tabindex="-1" aria-hidden="true"><img src="shots/radar-licitacoes.jpg" alt="" width="960" height="600"></a>
       <div class="body">
         <div class="top"><span class="n">01</span><span class="live">● online</span></div>
         <h3>Radar de Licitações</h3><div class="what">painel de editais · Lei 14.133</div>
@@ -359,7 +431,7 @@ h1 .last { display: block; color: transparent; -webkit-text-stroke: 2px var(--pa
       </div>
     </article>
     <article class="card proj">
-      <a class="shot" href="schema-lab/index.html" tabindex="-1" aria-hidden="true"><img src="shots/schema-lab.jpg" alt="" width="960" height="600" loading="lazy"></a>
+      <a class="shot" href="schema-lab/index.html" tabindex="-1" aria-hidden="true"><img src="shots/schema-lab.jpg" alt="" width="960" height="600"></a>
       <div class="body">
         <div class="top"><span class="n">02</span><span class="live">● online</span></div>
         <h3>Schema Lab</h3><div class="what">migrations · diagrama e riscos</div>
@@ -369,7 +441,7 @@ h1 .last { display: block; color: transparent; -webkit-text-stroke: 2px var(--pa
       </div>
     </article>
     <article class="card proj">
-      <a class="shot" href="motor-workflow/index.html" tabindex="-1" aria-hidden="true"><img src="shots/motor-workflow.jpg" alt="" width="960" height="600" loading="lazy"></a>
+      <a class="shot" href="motor-workflow/index.html" tabindex="-1" aria-hidden="true"><img src="shots/motor-workflow.jpg" alt="" width="960" height="600"></a>
       <div class="body">
         <div class="top"><span class="n">03</span><span class="live">● online</span></div>
         <h3>Motor de Workflow</h3><div class="what">máquina de estados · editor e simulador</div>
@@ -379,7 +451,7 @@ h1 .last { display: block; color: transparent; -webkit-text-stroke: 2px var(--pa
       </div>
     </article>
     <article class="card proj">
-      <a class="shot" href="guardiao-lgpd/index.html" tabindex="-1" aria-hidden="true"><img src="shots/guardiao-lgpd.jpg" alt="" width="960" height="600" loading="lazy"></a>
+      <a class="shot" href="guardiao-lgpd/index.html" tabindex="-1" aria-hidden="true"><img src="shots/guardiao-lgpd.jpg" alt="" width="960" height="600"></a>
       <div class="body">
         <div class="top"><span class="n">04</span><span class="live">● online</span></div>
         <h3>Guardião LGPD</h3><div class="what">anonimização de dados · 100% local</div>
@@ -389,7 +461,7 @@ h1 .last { display: block; color: transparent; -webkit-text-stroke: 2px var(--pa
       </div>
     </article>
     <article class="card proj">
-      <a class="shot" href="pousada-manager/index.html" tabindex="-1" aria-hidden="true"><img src="shots/pousada-manager.jpg" alt="" width="960" height="600" loading="lazy"></a>
+      <a class="shot" href="pousada-manager/index.html" tabindex="-1" aria-hidden="true"><img src="shots/pousada-manager.jpg" alt="" width="960" height="600"></a>
       <div class="body">
         <div class="top"><span class="n">05</span><span class="live">● online</span></div>
         <h3>Pousada Manager</h3><div class="what">reservas, indicadores e chatbot</div>
@@ -478,18 +550,26 @@ h1 .last { display: block; color: transparent; -webkit-text-stroke: 2px var(--pa
   const root = document.documentElement, track = document.getElementById('track'), vp = track.parentElement;
   const panels = [...track.querySelectorAll('.panel')], prog = document.getElementById('prog'), links = [...document.querySelectorAll('#navlist a')];
   const nums = [...document.querySelectorAll('.chap .cn')];
-  let H = innerHeight, dist = 0, cur = 0, target = 0, raf = 0, horiz = false;
+  let H = innerHeight, dist = 0, cur = 0, target = 0, raf = 0, horiz = false, mob = false, slides = [];
+  const SLIDES = '.panel > .col:not(.sk-col), .panel > .proj, .panel > .ia-main, .panel > .st-grid, .tl > .tl-col, .sk-col > .sk';
+  const center = el => { let x = el.offsetLeft, p = el.offsetParent; while (p && p !== track) { x += p.offsetLeft; p = p.offsetParent; } return Math.max(0, Math.min(dist, x + el.offsetWidth / 2 - innerWidth / 2)); };
   function stageHeight() {
     const sh = (screen && screen.availHeight) || 900;
     return innerHeight > sh + 40 ? Math.max(600, Math.min(sh - 90, 900)) : innerHeight;   // visualizador que estica a altura
   }
   function layout() {
     H = stageHeight(); root.style.setProperty('--vh1', (H / 100) + 'px');
-    horiz = !matchMedia('(max-width: 760px), (pointer: coarse), (prefers-reduced-motion: reduce)').matches && H >= 560;
-    root.classList.toggle('vert', !horiz);
+    mob = matchMedia('(max-width: 760px), (pointer: coarse)').matches;
+    horiz = mob || H >= 520;
+    root.classList.toggle('vert', !horiz); root.classList.toggle('mob', horiz && mob);
     if (!horiz) { track.style.transform = ''; root.style.removeProperty('--vh1'); return; }
-    dist = Math.max(0, track.scrollWidth - innerWidth); target = Math.min(target, dist); cur = Math.min(cur, dist); paint();
+    dist = Math.max(0, track.scrollWidth - innerWidth);
+    slides = mob ? [...track.querySelectorAll(SLIDES)].map(center).filter((v, i, a) => i === 0 || Math.abs(v - a[i - 1]) > 4).sort((a, b) => a - b) : [];
+    if (mob && slides.length) { const n = nearest(target); target = cur = slides[n]; } else { target = Math.min(target, dist); cur = Math.min(cur, dist); }
+    paint();
   }
+  function nearest(x) { let b = 0; slides.forEach((v, i) => { if (Math.abs(v - x) < Math.abs(slides[b] - x)) b = i; }); return b; }
+  function snapTo(i) { move(slides[Math.max(0, Math.min(slides.length - 1, i))]); }
   function act() { let a = 0; panels.forEach((s, i) => { if (s.offsetLeft - innerWidth * .45 <= cur) a = i; }); return a; }
   function paint() {
     track.style.transform = `translate3d(${-cur}px,0,0)`;
@@ -501,7 +581,8 @@ h1 .last { display: block; color: transparent; -webkit-text-stroke: 2px var(--pa
   function tick(now) { const dt = Math.min(64, now - (last || now - 16)); last = now;
     cur += (target - cur) * (1 - Math.pow(1 - .16, dt / 16.7)); if (Math.abs(target - cur) < .5) cur = target;
     paint(); if (cur !== target) raf = requestAnimationFrame(tick); else { raf = 0; last = 0; } }
-  function move(to) { target = Math.max(0, Math.min(dist, to)); if (!raf) raf = requestAnimationFrame(tick); }
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function move(to) { target = Math.max(0, Math.min(dist, to)); if (still) { cur = target; paint(); return; } if (!raf) raf = requestAnimationFrame(tick); }
   // roda e touchpad: vertical ou lateral, as duas avançam
   addEventListener('wheel', e => { if (!horiz) return; const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
     const k = e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? innerWidth : 1;
@@ -511,6 +592,8 @@ h1 .last { display: block; color: transparent; -webkit-text-stroke: 2px var(--pa
   addEventListener('keydown', e => { const t = e.target; if (!horiz || (t && t.closest && t.closest('input,textarea,select'))) return;
     const step = innerWidth * .8, a = act();
     const map = { ArrowDown: target + 120, ArrowUp: target - 120, PageDown: target + step, PageUp: target - step, ' ': target + (e.shiftKey ? -step : step), Home: 0, End: dist };
+    if (mob && ['ArrowRight', 'ArrowDown', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); snapTo(nearest(target) + 1); return; }
+    if (mob && ['ArrowLeft', 'ArrowUp', 'PageUp'].includes(e.key)) { e.preventDefault(); snapTo(nearest(target) - 1); return; }
     if (e.key === 'ArrowRight') { e.preventDefault(); go(Math.min(panels.length - 1, a + 1)); return; }
     if (e.key === 'ArrowLeft') { e.preventDefault(); go(Math.max(0, a - 1)); return; }
     if (e.key in map) { e.preventDefault(); move(map[e.key]); } });
@@ -522,7 +605,23 @@ h1 .last { display: block; color: transparent; -webkit-text-stroke: 2px var(--pa
   // ao navegar com Tab, traz o item focado para a tela
   addEventListener('focusin', e => { if (!horiz || !track.contains(e.target)) return; const r = e.target.getBoundingClientRect();
     if (r.left < 40 || r.right > innerWidth - 40) move(target + r.left - innerWidth * .3); });
-  function go(i) { const s = panels[i]; if (!s) return; if (horiz) move(s.offsetLeft); else s.scrollIntoView({ behavior: 'smooth' }); }
+  function go(i) { const s = panels[i]; if (!s) return; if (!horiz) { s.scrollIntoView({ behavior: 'smooth' }); return; }
+    if (mob) { const first = s.querySelector(SLIDES.split(', ').map(x => x.replace('.panel > ', ':scope > ')).join(', ')) || s; snapTo(nearest(center(first))); } else move(s.offsetLeft); }
+  // celular: deslizar (para o lado ou para cima) passa de uma tela para a outra
+  let tch = null;
+  vp.addEventListener('touchstart', e => { if (!horiz || !mob || e.touches.length > 1) return; const t = e.touches[0];
+    tch = { x: t.clientX, y: t.clientY, t: performance.now(), start: target, axis: null, sl: e.target.closest && e.target.closest(SLIDES) }; }, { passive: true });
+  vp.addEventListener('touchmove', e => { if (!tch) return; const t = e.touches[0], dx = t.clientX - tch.x, dy = t.clientY - tch.y;
+    if (!tch.axis) { if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      const sl = tch.sl, vertical = Math.abs(dy) > Math.abs(dx);
+      const canScroll = sl && sl.scrollHeight > sl.clientHeight + 2 && (dy < 0 ? sl.scrollTop + sl.clientHeight < sl.scrollHeight - 2 : sl.scrollTop > 2);
+      tch.axis = vertical && canScroll ? 'native' : 'h'; }
+    if (tch.axis === 'native') return;
+    e.preventDefault(); tch.d = Math.abs(dx) > Math.abs(dy) ? dx : dy;
+    target = cur = Math.max(-60, Math.min(dist + 60, tch.start - tch.d)); paint(); }, { passive: false });
+  vp.addEventListener('touchend', () => { if (!tch) return; const t = tch; tch = null; if (t.axis !== 'h') return;
+    const v = (t.d || 0) / Math.max(1, performance.now() - t.t), i0 = nearest(t.start);
+    const i = Math.abs(t.d) > innerWidth * .18 || Math.abs(v) > .35 ? i0 + (t.d < 0 ? 1 : -1) : i0; snapTo(i); });
   document.querySelectorAll('[data-go]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); go(+a.dataset.go); }));
   addEventListener('scroll', () => { if (!horiz) prog.style.width = (scrollY / Math.max(1, root.scrollHeight - innerHeight) * 100) + '%'; }, { passive: true });
   addEventListener('resize', layout);
@@ -614,9 +713,26 @@ h1 .last { display: block; color: transparent; -webkit-text-stroke: 2px var(--pa
       nodes.forEach((n, i) => { if (!reduce) { n.core.rotation.x += .01; n.core.rotation.y += .013; } n.ring.rotation.x = Math.PI / 2 + Math.sin(t * .02 + i) * .3; });
       for (const p of packets) { if (!reduce) p.userData.t = (p.userData.t + .0025) % 1; p.position.set(p.userData.t * 10.4, Math.sin(p.userData.t * 40) * .06, 0); }
       group.rotation.y += (mx * .18 - group.rotation.y) * .03; group.rotation.x += (my * .12 + .05 - group.rotation.x) * .03;
+      camera.position.z = Math.max(5.6, 13.5 / camera.aspect); camera.position.y = 1.3 + Math.max(0, camera.position.z - 5.6) * .15;
       camera.lookAt(5.2, .1, 0);
     };
   });
+})();
+</script>
+
+<script>
+(() => {
+  const bar = document.querySelector('.bar'), btn = document.getElementById('menuBtn'), links = [...document.querySelectorAll('#navlist a')];
+  const close = () => { bar.classList.remove('open'); btn.setAttribute('aria-expanded', 'false'); };
+  btn.addEventListener('click', () => { const o = !bar.classList.contains('open'); bar.classList.toggle('open', o); btn.setAttribute('aria-expanded', String(o)); });
+  links.forEach(a => a.addEventListener('click', close));
+  document.querySelector('.mark').addEventListener('click', close);
+  addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  // no modo vertical, destaca no menu a seção visível
+  const ids = links.map(a => a.getAttribute('href').slice(1));
+  addEventListener('scroll', () => { if (!document.documentElement.classList.contains('vert')) return;
+    let cur = ''; ids.forEach(id => { const el = document.getElementById(id); if (el && el.getBoundingClientRect().top < innerHeight * .35) cur = id; });
+    links.forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + cur)); }, { passive: true });
 })();
 </script>
 </body>
